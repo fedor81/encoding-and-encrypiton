@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use super::{Codes, CodesBuilder};
 
+#[derive(Debug, Default)]
 pub struct ShannonFanoEncoder {}
 
 impl ShannonFanoEncoder {}
@@ -13,7 +14,7 @@ impl ShannonFanoEncoder {
 }
 
 impl CodesBuilder for ShannonFanoEncoder {
-    fn build_optimal_codes(&mut self, mut probabilities: Vec<f64>) -> Codes {
+    fn build_optimal_codes(mut probabilities: Vec<f64>) -> Codes {
         match probabilities.len() {
             0 => return Codes::default(),
             1 => return Codes::new(probabilities, vec!["0".into()]),
@@ -111,21 +112,15 @@ mod tests {
     fn test_build_optimal_codes() {
         assert_eq!(
             vec!["00", "01", "10", "11"],
-            ShannonFanoEncoder::new()
-                .build_optimal_codes(vec![0.25, 0.25, 0.25, 0.25])
-                .codes
+            ShannonFanoEncoder::build_optimal_codes(vec![0.25, 0.25, 0.25, 0.25]).codes
         );
         assert_eq!(
             vec!["0", "10", "110", "111"],
-            ShannonFanoEncoder::new()
-                .build_optimal_codes(vec![0.5, 0.25, 0.125, 0.125])
-                .codes
+            ShannonFanoEncoder::build_optimal_codes(vec![0.5, 0.25, 0.125, 0.125]).codes
         );
         assert_eq!(
             vec!["0"],
-            ShannonFanoEncoder::new()
-                .build_optimal_codes(vec![1.0])
-                .codes
+            ShannonFanoEncoder::build_optimal_codes(vec![1.0]).codes
         );
 
         // 0.20 - 00
@@ -145,11 +140,10 @@ mod tests {
                 "00", "010", "011", "100", "101", "1100", "1101", "11100", "11101", "11110",
                 "111110", "111111",
             ],
-            ShannonFanoEncoder::new()
-                .build_optimal_codes(vec![
-                    0.20, 0.15, 0.14, 0.13, 0.09, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01
-                ])
-                .codes
+            ShannonFanoEncoder::build_optimal_codes(vec![
+                0.20, 0.15, 0.14, 0.13, 0.09, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01
+            ])
+            .codes
         );
     }
 }

@@ -1,4 +1,5 @@
 mod huffman;
+pub mod io;
 mod shannon_fano;
 
 pub use huffman::HuffmanEncoder;
@@ -8,7 +9,7 @@ pub trait CodesBuilder {
     /// Строит оптимальный код на основе вероятностей вхождений символов.
     /// Сумма `probabilities` должна быть равна `1`.
     /// Возвращает вектор строк, где каждый элемент - код символа.
-    fn build_optimal_codes(&mut self, probabilities: Vec<f64>) -> Codes;
+    fn build_optimal_codes(probabilities: Vec<f64>) -> Codes;
 }
 
 #[derive(Debug, Default)]
@@ -18,6 +19,14 @@ pub struct Codes {
 }
 
 impl Codes {
+    pub fn probabilities(&self) -> &[f64] {
+        &self.probabilities
+    }
+
+    pub fn codes(&self) -> &[String] {
+        &self.codes
+    }
+
     pub fn new(probabilities: Vec<f64>, codes: Vec<String>) -> Self {
         Self {
             probabilities,
