@@ -12,7 +12,11 @@
 - Построение кодов по вектору вероятностей.
 - Вычисление: средней длинны кодов, коэффициентов статистического сжатия и относительной эффективности.
 
+```sh
+cargo run --bin efficient_encoding
 ```
+
+```text
 Enter a vector of probabilities of characters appearing separated by a whitespace:
 0.170 0.168 0.166 0.140 0.118 0.110 0.083 0.045
 

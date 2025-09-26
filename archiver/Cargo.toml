@@ -3,4 +3,12 @@ name = "archiver"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "efficient_encoding"
+path = "src/bin/efficient_encoding.rs"
+
+[[bin]]
+name = "huffman_archiver"
+path = "src/bin/huffman_archiver.rs"
+
 [dependencies]

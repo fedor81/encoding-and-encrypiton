@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::{Codes, CodesBuilder};
+use super::{Codes, CodesBuilder, sort_words_and_probabilities};
 
 #[derive(Debug, Default)]
 pub struct ShannonFanoEncoder {}
@@ -14,14 +14,14 @@ impl ShannonFanoEncoder {
 }
 
 impl CodesBuilder for ShannonFanoEncoder {
-    fn build_optimal_codes(mut probabilities: Vec<f64>) -> Codes {
+    fn build_optimal_codes(words: Vec<u8>, mut probabilities: Vec<f64>) -> Codes {
         match probabilities.len() {
             0 => return Codes::default(),
-            1 => return Codes::new(probabilities, vec!["0".into()]),
+            1 => return Codes::new(words, probabilities, vec!["0".into()]),
             _ => {}
         }
 
-        probabilities.sort_by(|a, b| a.partial_cmp(b).unwrap().reverse());
+        let (words, probabilities) = sort_words_and_probabilities(words, probabilities);
 
         let mut codes = vec![String::new(); probabilities.len()];
         let mut queue: VecDeque<(&[f64], &mut [String])> = VecDeque::new();
@@ -48,7 +48,7 @@ impl CodesBuilder for ShannonFanoEncoder {
             }
         }
 
-        Codes::new(probabilities, codes)
+        Codes::new(words, probabilities, codes)
     }
 }
 
@@ -108,20 +108,25 @@ mod tests {
         );
     }
 
+    fn build_optimal_codes_test_helper(expected: Vec<&str>, probabilities: Vec<f64>) {
+        assert_eq!(
+            expected,
+            ShannonFanoEncoder::build_optimal_codes(
+                vec![0; probabilities.len()],
+                vec![0.25, 0.25, 0.25, 0.25]
+            )
+            .codes()
+        );
+    }
+
     #[test]
     fn test_build_optimal_codes() {
-        assert_eq!(
-            vec!["00", "01", "10", "11"],
-            ShannonFanoEncoder::build_optimal_codes(vec![0.25, 0.25, 0.25, 0.25]).codes
-        );
-        assert_eq!(
+        build_optimal_codes_test_helper(vec!["00", "01", "10", "11"], vec![0.25, 0.25, 0.25, 0.25]);
+        build_optimal_codes_test_helper(
             vec!["0", "10", "110", "111"],
-            ShannonFanoEncoder::build_optimal_codes(vec![0.5, 0.25, 0.125, 0.125]).codes
+            vec![0.5, 0.25, 0.125, 0.125],
         );
-        assert_eq!(
-            vec!["0"],
-            ShannonFanoEncoder::build_optimal_codes(vec![1.0]).codes
-        );
+        build_optimal_codes_test_helper(vec!["0"], vec![1.0]);
 
         // 0.20 - 00
         // 0.15 - 010
@@ -135,15 +140,14 @@ mod tests {
         // 0.03 - 11110
         // 0.02 - 111110
         // 0.01 - 111111
-        assert_eq!(
+        build_optimal_codes_test_helper(
             vec![
                 "00", "010", "011", "100", "101", "1100", "1101", "11100", "11101", "11110",
                 "111110", "111111",
             ],
-            ShannonFanoEncoder::build_optimal_codes(vec![
-                0.20, 0.15, 0.14, 0.13, 0.09, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01
-            ])
-            .codes
+            vec![
+                0.20, 0.15, 0.14, 0.13, 0.09, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01,
+            ],
         );
     }
 }

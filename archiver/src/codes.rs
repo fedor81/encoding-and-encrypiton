@@ -1,21 +1,10 @@
-mod huffman;
-pub mod io;
-mod shannon_fano;
-
-pub use huffman::HuffmanEncoder;
-pub use shannon_fano::ShannonFanoEncoder;
-
-pub trait CodesBuilder {
-    /// Строит оптимальный код на основе вероятностей вхождений символов.
-    /// Сумма `probabilities` должна быть равна `1`.
-    /// Возвращает вектор строк, где каждый элемент - код символа.
-    fn build_optimal_codes(probabilities: Vec<f64>) -> Codes;
-}
+use std::collections::HashMap;
 
 #[derive(Debug, Default)]
 pub struct Codes {
     probabilities: Vec<f64>,
     codes: Vec<String>,
+    words: Vec<u8>,
 }
 
 impl Codes {
@@ -27,10 +16,15 @@ impl Codes {
         &self.codes
     }
 
-    pub fn new(probabilities: Vec<f64>, codes: Vec<String>) -> Self {
+    pub fn words(&self) -> &[u8] {
+        &self.words
+    }
+
+    pub fn new(words: Vec<u8>, probabilities: Vec<f64>, codes: Vec<String>) -> Self {
         Self {
             probabilities,
             codes,
+            words,
         }
     }
 
@@ -83,6 +77,16 @@ impl Codes {
     }
 }
 
+impl Into<HashMap<u8, String>> for Codes {
+    fn into(self) -> HashMap<u8, String> {
+        let mut word_code = HashMap::new();
+        for (word, code) in self.words.into_iter().zip(self.codes.into_iter()) {
+            word_code.insert(word, code).expect("");
+        }
+        word_code
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Codes;
@@ -92,75 +96,67 @@ mod tests {
         strings.iter().map(|&s| s.to_string()).collect()
     }
 
+    fn codes_without_words(probabilities: Vec<f64>, codes: &[&str]) -> Codes {
+        Codes::new(vec![0; probabilities.len()], probabilities, str_vec(codes))
+    }
+
     #[test]
     fn test_mean_code_length() {
-        let codes = Codes::new(
-            vec![0.25, 0.25, 0.25, 0.25],
-            str_vec(&["00", "01", "10", "11"]),
-        );
+        let codes = codes_without_words(vec![0.25, 0.25, 0.25, 0.25], &["00", "01", "10", "11"]);
         assert_eq!(2.0, codes.mean_code_length());
 
-        let codes = Codes::new(
-            vec![0.5, 0.25, 0.125, 0.125],
-            str_vec(&["0", "10", "110", "111"]),
-        );
+        let codes = codes_without_words(vec![0.5, 0.25, 0.125, 0.125], &["0", "10", "110", "111"]);
         assert_eq!(1.75, codes.mean_code_length());
 
-        let codes = Codes::new(
-            vec![0.4, 0.3, 0.2, 0.1],
-            str_vec(&["0", "10", "110", "1110"]),
-        );
+        let codes = codes_without_words(vec![0.4, 0.3, 0.2, 0.1], &["0", "10", "110", "1110"]);
         assert_eq!(2.0, codes.mean_code_length());
 
-        let codes = Codes::new(vec![0.5, 0.5], str_vec(&["0", "1"]));
+        let codes = codes_without_words(vec![0.5, 0.5], &["0", "1"]);
         assert_eq!(1.0, codes.mean_code_length());
 
-        let codes = Codes::new(vec![0.5, 0.4, 0.1], str_vec(&["000", "1110000", "0001111"]));
+        let codes = codes_without_words(vec![0.5, 0.4, 0.1], &["000", "1110000", "0001111"]);
         assert!((codes.mean_code_length() - 5.0).abs() < 0.000001);
 
-        let codes = Codes::new(vec![0.8, 0.1, 0.1], str_vec(&["0", "10", "11"]));
+        let codes = codes_without_words(vec![0.8, 0.1, 0.1], &["0", "10", "11"]);
         assert_eq!(1.2, codes.mean_code_length());
     }
 
     #[test]
     fn test_entropy() {
-        let codes = Codes::new(
-            vec![0.25, 0.25, 0.25, 0.25],
-            str_vec(&["00", "01", "10", "11"]),
-        );
+        let codes = codes_without_words(vec![0.25, 0.25, 0.25, 0.25], &["00", "01", "10", "11"]);
         assert_eq!(2.0, codes.entropy());
 
-        let codes = Codes::new(vec![0.5, 0.25, 0.25], str_vec(&["0", "10", "11"]));
+        let codes = codes_without_words(vec![0.5, 0.25, 0.25], &["0", "10", "11"]);
         assert_eq!(1.5, codes.entropy());
 
-        let codes = Codes::new(vec![1.0], str_vec(&["0"]));
+        let codes = codes_without_words(vec![1.0], &["0"]);
         assert_eq!(0.0, codes.entropy());
 
-        let codes = Codes::new(vec![0.5], str_vec(&["0"]));
+        let codes = codes_without_words(vec![0.5], &["0"]);
         assert_eq!(0.5, codes.entropy());
 
-        let codes = Codes::new(vec![0.5, 0.5], str_vec(&["0", "1"]));
+        let codes = codes_without_words(vec![0.5, 0.5], &["0", "1"]);
         assert_eq!(1.0, codes.entropy());
 
-        let codes = Codes::new(vec![0.5, 0.4, 0.1], str_vec(&["000", "1110000", "0001111"]));
+        let codes = codes_without_words(vec![0.5, 0.4, 0.1], &["000", "1110000", "0001111"]);
         assert!((codes.entropy() - 1.36).abs() < 0.001);
     }
 
     #[test]
     fn test_relative_efficiency_ratio() {
-        let codes = Codes::new(vec![0.5, 0.5], str_vec(&["0", "1"]));
+        let codes = codes_without_words(vec![0.5, 0.5], &["0", "1"]);
         assert_eq!(1.0, codes.relative_efficiency_ratio());
 
-        let codes = Codes::new(vec![0.5, 0.4, 0.1], str_vec(&["000", "1110000", "0001111"]));
+        let codes = codes_without_words(vec![0.5, 0.4, 0.1], &["000", "1110000", "0001111"]);
         assert!((codes.relative_efficiency_ratio() - 0.272).abs() < 0.001);
     }
 
     #[test]
     fn test_statistical_compression_ratio() {
-        let codes = Codes::new(vec![0.5, 0.5], str_vec(&["0", "1"]));
+        let codes = codes_without_words(vec![0.5, 0.5], &["0", "1"]);
         assert_eq!(1.0, codes.statistical_compression_ratio());
 
-        let codes = Codes::new(vec![0.8, 0.1, 0.1], str_vec(&["0", "10", "11"]));
+        let codes = codes_without_words(vec![0.8, 0.1, 0.1], &["0", "10", "11"]);
         assert!((codes.statistical_compression_ratio() - 1.66666).abs() < 0.00001);
     }
 }
