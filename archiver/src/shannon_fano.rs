@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::{Codes, CodesBuilder, sort_words_and_probabilities};
+use super::{Codes, CodesBuilder, utils::sort_words_and_probabilities};
 
 #[derive(Debug, Default)]
 pub struct ShannonFanoEncoder {}
@@ -14,7 +14,7 @@ impl ShannonFanoEncoder {
 }
 
 impl CodesBuilder for ShannonFanoEncoder {
-    fn build_optimal_codes(words: Vec<u8>, mut probabilities: Vec<f64>) -> Codes {
+    fn build_optimal_codes(words: Vec<u8>, probabilities: Vec<f64>) -> Codes {
         match probabilities.len() {
             0 => return Codes::default(),
             1 => return Codes::new(words, probabilities, vec!["0".into()]),
@@ -111,11 +111,8 @@ mod tests {
     fn build_optimal_codes_test_helper(expected: Vec<&str>, probabilities: Vec<f64>) {
         assert_eq!(
             expected,
-            ShannonFanoEncoder::build_optimal_codes(
-                vec![0; probabilities.len()],
-                vec![0.25, 0.25, 0.25, 0.25]
-            )
-            .codes()
+            ShannonFanoEncoder::build_optimal_codes(vec![0; probabilities.len()], probabilities)
+                .codes()
         );
     }
 

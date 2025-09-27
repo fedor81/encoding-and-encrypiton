@@ -1,9 +1,11 @@
-use crate::{Codes, CodesBuilder, HuffmanEncoder, ShannonFanoEncoder};
+use std::collections::HashMap;
+
+use crate::{Codes, CodesBuilder, HuffmanArchiver, ShannonFanoEncoder};
 
 #[derive(Debug)]
 pub enum EncoderChoice {
     ShannonFano(ShannonFanoEncoder),
-    Huffman(HuffmanEncoder),
+    Huffman(HuffmanArchiver),
 }
 
 impl EncoderChoice {
@@ -13,7 +15,7 @@ impl EncoderChoice {
             EncoderChoice::ShannonFano(_) => {
                 ShannonFanoEncoder::build_optimal_codes(words, probabilities)
             }
-            EncoderChoice::Huffman(_) => HuffmanEncoder::build_optimal_codes(words, probabilities),
+            EncoderChoice::Huffman(_) => HuffmanArchiver::build_optimal_codes(words, probabilities),
         }
     }
 
@@ -32,7 +34,7 @@ impl EncoderChoice {
             if let Ok(algorithm) = buf.trim().parse() {
                 match algorithm {
                     0 => return EncoderChoice::ShannonFano(ShannonFanoEncoder::new()),
-                    1 => return EncoderChoice::Huffman(HuffmanEncoder::new(todo!())),
+                    1 => return EncoderChoice::Huffman(HuffmanArchiver::new(HashMap::new())),
                     _ => {
                         println!("Entered unavailable number!");
                         continue;

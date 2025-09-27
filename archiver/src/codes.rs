@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -21,6 +22,9 @@ impl Codes {
     }
 
     pub fn new(words: Vec<u8>, probabilities: Vec<f64>, codes: Vec<String>) -> Self {
+        assert_eq!(words.len(), probabilities.len());
+        assert_eq!(words.len(), codes.len());
+
         Self {
             probabilities,
             codes,
@@ -81,7 +85,9 @@ impl Into<HashMap<u8, String>> for Codes {
     fn into(self) -> HashMap<u8, String> {
         let mut word_code = HashMap::new();
         for (word, code) in self.words.into_iter().zip(self.codes.into_iter()) {
-            word_code.insert(word, code).expect("");
+            if word_code.insert(word, code).is_some() {
+                panic!("Duplicate code for word: {}", word);
+            }
         }
         word_code
     }

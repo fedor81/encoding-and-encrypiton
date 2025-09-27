@@ -12,3 +12,4 @@ name = "huffman_archiver"
 path = "src/bin/huffman_archiver.rs"
 
 [dependencies]
+anyhow = "1.0.100"

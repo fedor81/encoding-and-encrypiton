@@ -1,4 +1,12 @@
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::PathBuf,
+};
+
+use anyhow::{Context, Result};
+
+use crate::StateSaver;
 
 /// Интерфейс для кодирования последовательности байтов в строку. Не потоковый!
 pub trait Encoder {
@@ -34,15 +42,36 @@ pub trait Encoder {
         encoded
     }
 
-    fn encode_file(&self, path: &PathBuf) -> Vec<u8> {
+    fn encode_file(&self, path: &PathBuf) -> Result<Vec<u8>> {
         let mut file = File::open(path).expect("Failed to open file");
         let size = file
             .metadata()
-            .expect("Failed to extract file metadata")
+            .context("Failed to extract file metadata")?
             .len();
-        let mut buf = vec![0u8; size as usize];
+        let mut buf = Vec::with_capacity(size as usize);
         file.read_to_end(&mut buf).expect("Failed to read file");
 
-        self.encode_bytes(&buf)
+        Ok(self.encode_bytes(&buf))
     }
 }
+
+pub trait FileEncoder
+where
+    Self: Encoder + StateSaver + Sized,
+{
+    fn encode_file(self, target: &PathBuf, destination: &PathBuf) -> Result<()> {
+        let encoded_file = Encoder::encode_file(&self, target);
+        let state = self.save_state();
+        let mut file = File::create(destination).context("Failed to create file")?;
+
+        // Записываем размер состояния, состояние и сжатый файл
+        file.write_all(state.len().to_le_bytes().as_slice())
+            .context("Failed to write state length to file")?;
+        file.write_all(&state).context("Failed to write state")?;
+        file.write_all(&encoded_file?)
+            .context("Failed to write encoded file")?;
+        Ok(())
+    }
+}
+
+impl<T> FileEncoder for T where T: Encoder + StateSaver {}

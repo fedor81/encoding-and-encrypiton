@@ -1,4 +1,5 @@
-use std::{path::PathBuf, str::FromStr};
+use anyhow::{Context, Result};
+use std::{env, path::PathBuf, str::FromStr};
 
 use crate::Codes;
 
@@ -39,11 +40,33 @@ where
         .collect::<Vec<_>>();
 }
 
-pub fn read_filepath(output: &str) -> PathBuf {
+pub fn read_filepath(output: &str) -> Result<PathBuf> {
     let stdin = std::io::stdin();
     let mut buf = String::new();
 
     println!("\n{}", output);
-    stdin.read_line(&mut buf).expect("Failed to read line");
-    buf.into()
+    stdin.read_line(&mut buf).context("Failed to read input")?;
+
+    let path_str = buf.trim();
+    if path_str.is_empty() {
+        anyhow::bail!("No path provided");
+    }
+
+    let path = PathBuf::from(path_str);
+    path_to_absolute(path)
+}
+
+pub fn path_to_absolute(path: PathBuf) -> Result<PathBuf> {
+    if path.is_absolute() {
+        Ok(path)
+    } else {
+        let current_dir = env::current_dir().context("Failed to get current directory")?;
+        let absolute_path = current_dir.join(&path);
+
+        // Пытаемся канонизировать, но если файл не существует, это нормально
+        match absolute_path.canonicalize() {
+            Ok(canonical) => Ok(canonical),
+            Err(_) => Ok(absolute_path),
+        }
+    }
 }
