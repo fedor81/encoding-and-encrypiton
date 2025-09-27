@@ -8,3 +8,6 @@ target/
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# Закодированные файлы
+**.huff

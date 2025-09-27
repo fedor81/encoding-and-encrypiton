@@ -81,6 +81,18 @@ impl Codes {
     }
 }
 
+impl Into<HashMap<u8, String>> for &Codes {
+    fn into(self) -> HashMap<u8, String> {
+        let mut word_code = HashMap::new();
+        for (&word, code) in self.words.iter().zip(self.codes.iter()) {
+            if word_code.insert(word, code.clone()).is_some() {
+                panic!("Duplicate code for word: {}", word);
+            }
+        }
+        word_code
+    }
+}
+
 impl Into<HashMap<u8, String>> for Codes {
     fn into(self) -> HashMap<u8, String> {
         let mut word_code = HashMap::new();

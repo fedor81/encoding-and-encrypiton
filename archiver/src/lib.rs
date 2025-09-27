@@ -42,3 +42,5 @@ where
     Self: FileEncoder + FileDecoder,
 {
 }
+
+impl<T> FileArchiver for T where T: FileEncoder + FileDecoder {}

@@ -11,5 +11,9 @@ path = "src/bin/efficient_encoding.rs"
 name = "huffman_archiver"
 path = "src/bin/huffman_archiver.rs"
 
+[[bin]]
+name = "huffman_decoder"
+path = "src/bin/huffman_decoder.rs"
+
 [dependencies]
 anyhow = "1.0.100"

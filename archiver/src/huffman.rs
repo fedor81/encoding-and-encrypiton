@@ -1,18 +1,22 @@
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
 
+use crate::{Decoder, huffman::huffman_tree::HuffmanTree};
+
 use super::{
     Codes, CodesBuilder, Encoder, StateSaver,
     utils::{convert_to_bytes, sort_words_and_probabilities},
 };
-use huffman_tree::build_tree;
+use decoder::HuffmanDecoder;
 
+mod decoder;
 mod huffman_tree;
 
 #[derive(Debug)]
 pub struct HuffmanArchiver {
     word_code: HashMap<u8, String>,
     mean_code_length: u16,
+    decoder: Option<HuffmanDecoder>,
 }
 
 impl HuffmanArchiver {
@@ -22,7 +26,29 @@ impl HuffmanArchiver {
         Self {
             mean_code_length: codes.mean_code_length().ceil() as u16,
             word_code: codes.into(),
+            decoder: None,
         }
+    }
+
+    /// Build word_code from the remaining state bytes
+    fn build_word_code(state: &[u8]) -> HashMap<u8, String> {
+        let mut word_code = HashMap::new();
+        let mut i = 0;
+
+        while i < state.len() {
+            let word = state[i];
+            let code_len = state[i + 1] as usize;
+            i += 2;
+
+            // Читаем значение кода
+            let code_value = u16::from_le_bytes([state[i], state[i + 1]]);
+            i += 2;
+
+            // Преобразуем число обратно в строковый код
+            let code = format!("{:0width$b}", code_value, width = code_len);
+            word_code.insert(word, code);
+        }
+        word_code
     }
 }
 
@@ -45,7 +71,7 @@ impl Encoder for HuffmanArchiver {
 impl CodesBuilder for HuffmanArchiver {
     fn build_optimal_codes(words: Vec<u8>, probabilities: Vec<f64>) -> Codes {
         let (words, probabilities) = sort_words_and_probabilities(words, probabilities);
-        let tree = build_tree(&probabilities);
+        let tree = HuffmanTree::build(&probabilities);
         let codes = tree.build_codes();
 
         Codes::new(words, probabilities, codes)
@@ -93,28 +119,31 @@ impl StateSaver for HuffmanArchiver {
         // Truncate the state to remove the mean_code_length bytes
         state.truncate(state.len() - 2);
 
-        // Build word_code from the remaining state bytes
-        let mut word_code = HashMap::new();
-        let mut i = 0;
-
-        while i < state.len() {
-            let word = state[i];
-            let code_len = state[i + 1] as usize;
-            i += 2;
-
-            // Читаем значение кода
-            let code_value = u16::from_le_bytes([state[i], state[i + 1]]);
-            i += 2;
-
-            // Преобразуем число обратно в строковый код
-            let code = format!("{:0width$b}", code_value, width = code_len);
-            word_code.insert(word, code);
-        }
-
-        Self {
-            word_code,
+        let mut entity = Self {
+            word_code: Self::build_word_code(&state),
             mean_code_length,
-        }
+            decoder: None,
+        };
+
+        entity.decoder = Some((&entity).into());
+        entity
+    }
+}
+
+impl Into<HuffmanDecoder> for &HuffmanArchiver {
+    /// Превращает Хаффман кодировщик в декодировщик!
+    fn into(self) -> HuffmanDecoder {
+        // TODO: Построить дерево
+        todo!()
+    }
+}
+
+impl Decoder for HuffmanArchiver {
+    fn decode_string(&self, bit_string: &str) -> Result<Vec<u8>> {
+        self.decoder
+            .as_ref()
+            .context("Failed to decode string: Huffman decoder does not set.")?
+            .decode_string(bit_string)
     }
 }
 
@@ -128,6 +157,19 @@ mod tests {
             vec!["0", "11", "10"],
             HuffmanArchiver::build_optimal_codes(vec![1, 2, 3], vec![0.5, 0.25, 0.25]).codes()
         );
+        assert_eq!(
+            vec!["0", "10", "110", "111"],
+            HuffmanArchiver::build_optimal_codes(vec![1, 2, 3, 4], vec![0.5, 0.25, 0.125, 0.125])
+                .codes()
+        );
+        assert_eq!(
+            vec!["00", "111", "110", "101", "011", "010", "1001", "1000"],
+            HuffmanArchiver::build_optimal_codes(
+                vec![1, 2, 3, 4, 5, 6, 7, 8],
+                vec![0.170, 0.168, 0.166, 0.140, 0.118, 0.110, 0.083, 0.045]
+            )
+            .codes()
+        );
     }
 
     #[test]
@@ -135,6 +177,7 @@ mod tests {
         let archiver = HuffmanArchiver {
             word_code: HashMap::from([(1, "1".into()), (2, "11".into()), (3, "1110".into())]),
             mean_code_length: 100,
+            decoder: None,
         };
 
         let state = archiver.save_state();
