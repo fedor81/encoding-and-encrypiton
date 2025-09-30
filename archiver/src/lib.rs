@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 
 mod codes;
@@ -29,12 +30,15 @@ pub trait CodesBuilder {
     }
 }
 
-pub trait StateSaver {
+pub trait StateSaver
+where
+    Self: Sized,
+{
     /// Сохраняет состояние объекта в вектор байтов.
-    fn save_state(self) -> Vec<u8>;
+    fn save_state(self) -> Result<Vec<u8>>;
 
     /// Загружает состояние объекта из вектора байтов.
-    fn load_state(state: Vec<u8>) -> Self;
+    fn load_state(state: Vec<u8>) -> Result<Self>;
 }
 
 pub trait FileArchiver

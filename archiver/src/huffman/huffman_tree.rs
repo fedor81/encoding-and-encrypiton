@@ -1,11 +1,13 @@
+use anyhow::{Context, Result};
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, VecDeque};
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 
 #[derive(Debug)]
 pub enum HuffmanTree {
     Leaf {
         probability: f64,
         index: usize,
+        word: u8,
     },
     Node {
         probability: f64,
@@ -16,18 +18,102 @@ pub enum HuffmanTree {
 }
 
 impl HuffmanTree {
-    pub fn build(probabilities: &[f64]) -> HuffmanTree {
+    pub fn restore_from_word_code(codes: &HashMap<u8, String>) -> Result<Self> {
+        if codes.is_empty() {
+            anyhow::bail!("Cannot restore HuffmanTree: no codes provided");
+        }
+
+        let mut root = HuffmanTree::Node {
+            probability: 0.0,
+            left: Box::new(Self::Leaf {
+                probability: 0.0,
+                index: usize::MAX,
+                word: 0,
+            }),
+            right: Box::new(HuffmanTree::Leaf {
+                probability: 0.0,
+                index: usize::MAX,
+                word: 0,
+            }),
+            count_codes: codes.len(),
+        };
+
+        for (word, code) in codes {
+            let mut current = &mut root;
+
+            for bit in code.chars() {
+                // Проверяем валидность бита
+                if bit != '0' && bit != '1' {
+                    anyhow::bail!(
+                        "Invalid code for word {}: code '{}' contains invalid character '{}'",
+                        word,
+                        code,
+                        bit
+                    );
+                }
+
+                match current {
+                    HuffmanTree::Node { left, right, .. } => {
+                        let next_node = if bit == '0' { left } else { right };
+
+                        // Если достигли конца кода, создаем лист
+                        if next_node.is_empty_leaf() {
+                            *next_node = Box::new(HuffmanTree::new_empty_node());
+                        }
+
+                        // Безопасно переходим к следующему узлу
+                        current = next_node.as_mut();
+                    }
+                    HuffmanTree::Leaf { .. } => {
+                        anyhow::bail!("Invalid code structure: prefix conflict for word {}", word);
+                    }
+                }
+            }
+
+            // Заменяем конечный узел на лист с данными
+            *current = Self::Leaf {
+                probability: 0.0,
+                index: *word as usize,
+                word: *word,
+            };
+        }
+
+        Ok(root)
+    }
+
+    fn new_empty_node() -> Self {
+        HuffmanTree::Node {
+            probability: 0.0,
+            left: Box::new(Self::Leaf {
+                probability: 0.0,
+                index: usize::MAX,
+                word: 0,
+            }),
+            right: Box::new(Self::Leaf {
+                probability: 0.0,
+                index: usize::MAX,
+                word: 0,
+            }),
+            count_codes: 0,
+        }
+    }
+
+    fn is_empty_leaf(&self) -> bool {
+        matches!(self, HuffmanTree::Leaf { index, .. } if *index == usize::MAX)
+    }
+
+    pub fn build(probabilities: &[f64], words: &[u8]) -> HuffmanTree {
         match probabilities.len() {
             0 => panic!("No probabilities provided"),
-            1 => return HuffmanTree::new_leaf(probabilities[0], 0),
+            1 => return HuffmanTree::new_leaf(probabilities[0], 0, words[0]),
             _ => {}
         }
 
-        let mut heap = probabilities
+        let mut heap = words
             .iter()
             .copied()
-            .enumerate()
-            .map(|(i, p)| HuffmanTree::new_leaf(p, i))
+            .zip(probabilities.iter().copied().enumerate())
+            .map(|(word, (idx, prob))| HuffmanTree::new_leaf(prob, idx, word))
             .collect::<BinaryHeap<_>>();
 
         while heap.len() >= 2 {
@@ -38,8 +124,12 @@ impl HuffmanTree {
         heap.pop().unwrap()
     }
 
-    pub fn new_leaf(probability: f64, index: usize) -> Self {
-        HuffmanTree::Leaf { probability, index }
+    pub fn new_leaf(probability: f64, index: usize, word: u8) -> Self {
+        HuffmanTree::Leaf {
+            probability,
+            index,
+            word,
+        }
     }
 
     pub fn unite(left: HuffmanTree, right: HuffmanTree) -> Self {
@@ -93,24 +183,40 @@ impl HuffmanTree {
         }
     }
 
-    pub fn build_codes(&self) -> Vec<String> {
+    // Общий метод, который возвращает итератор пар (ключ, код)
+    fn build_code_pairs(&self) -> Vec<(usize, String, u8)> {
+        let mut pairs = Vec::new();
         let mut queue = VecDeque::new();
         queue.push_back((self, String::new()));
 
-        let mut codes = vec![String::new(); self.count_codes()];
-
         while let Some((node, code)) = queue.pop_front() {
             match node {
-                HuffmanTree::Leaf { index, .. } => {
-                    codes[*index] = code;
+                HuffmanTree::Leaf { index, word, .. } => {
+                    pairs.push((*index, code.clone(), *word));
                 }
                 HuffmanTree::Node { left, right, .. } => {
-                    // Прямой доступ к полям без использования left()/right()
                     queue.push_back((left, format!("{}0", code)));
                     queue.push_back((right, format!("{}1", code)));
                 }
             }
         }
+        pairs
+    }
+
+    pub fn build_word_code(&self) -> HashMap<u8, String> {
+        self.build_code_pairs()
+            .into_iter()
+            .map(|(_, code, word)| (word, code))
+            .collect()
+    }
+
+    pub fn build_codes(&self) -> Vec<String> {
+        let mut codes = vec![String::new(); self.count_codes()];
+
+        for (index, code, _) in self.build_code_pairs() {
+            codes[index] = code;
+        }
+
         codes
     }
 
@@ -152,5 +258,37 @@ impl PartialOrd for HuffmanTree {
 impl Ord for HuffmanTree {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::HuffmanArchiver;
+
+    use super::*;
+
+    #[test]
+    fn test_restore_from_word_code() {
+        // TODO:
+
+        let word_code = HashMap::from([(0u8, "0".into()), (1, "10".into()), (2, "11".into())]);
+        let tree = HuffmanTree::restore_from_word_code(&word_code).unwrap();
+        assert_eq!(
+            tree,
+            HuffmanTree::Node {
+                probability: 0.0,
+                left: HuffmanTree::new_leaf(0.0, 0, 0).into(),
+                right: HuffmanTree::Node {
+                    probability: 0.0,
+                    left: HuffmanTree::new_leaf(0.0, 1, 1).into(),
+                    right: HuffmanTree::new_leaf(0.0, 2, 2).into(),
+                    count_codes: 2,
+                }
+                .into(),
+                count_codes: 3
+            }
+        );
+
+        assert_eq!(tree.build_word_code(), word_code);
     }
 }

@@ -1,12 +1,11 @@
 use anyhow::{Context, Result};
-use std::collections::{HashMap, HashSet};
-
-use crate::{Decoder, huffman::huffman_tree::HuffmanTree};
+use std::{cell::RefCell, collections::HashMap};
 
 use super::{
     Codes, CodesBuilder, Encoder, StateSaver,
     utils::{convert_to_bytes, sort_words_and_probabilities},
 };
+use crate::{Decoder, huffman::huffman_tree::HuffmanTree};
 use decoder::HuffmanDecoder;
 
 mod decoder;
@@ -16,18 +15,34 @@ mod huffman_tree;
 pub struct HuffmanArchiver {
     word_code: HashMap<u8, String>,
     mean_code_length: u16,
-    decoder: Option<HuffmanDecoder>,
+    decoder: RefCell<Option<HuffmanDecoder>>,
 }
 
 impl HuffmanArchiver {
     pub fn new(words_probabilities: HashMap<u8, f64>) -> Self {
         let codes = Self::build_optimal_codes_from_hashmap(words_probabilities);
+        Self::_new(codes.mean_code_length().ceil() as u16, codes.into())
+    }
 
+    fn _new(mean_code_length: u16, word_code: HashMap<u8, String>) -> Self {
         Self {
-            mean_code_length: codes.mean_code_length().ceil() as u16,
-            word_code: codes.into(),
-            decoder: None,
+            mean_code_length,
+            word_code,
+            decoder: RefCell::new(None),
         }
+    }
+
+    /// If decoder is not initialized, initialize it and return
+    fn decoder(&self) -> Result<std::cell::Ref<HuffmanDecoder>> {
+        // Проверяем, инициализирован ли уже декодер
+        if self.decoder.borrow().is_none() {
+            let decoder = HuffmanDecoder::try_from(&self.word_code)?;
+            *self.decoder.borrow_mut() = Some(decoder);
+        }
+
+        Ok(std::cell::Ref::map(self.decoder.borrow(), |opt| {
+            opt.as_ref().unwrap()
+        }))
     }
 
     /// Build word_code from the remaining state bytes
@@ -71,7 +86,7 @@ impl Encoder for HuffmanArchiver {
 impl CodesBuilder for HuffmanArchiver {
     fn build_optimal_codes(words: Vec<u8>, probabilities: Vec<f64>) -> Codes {
         let (words, probabilities) = sort_words_and_probabilities(words, probabilities);
-        let tree = HuffmanTree::build(&probabilities);
+        let tree = HuffmanTree::build(&probabilities, &words);
         let codes = tree.build_codes();
 
         Codes::new(words, probabilities, codes)
@@ -79,7 +94,7 @@ impl CodesBuilder for HuffmanArchiver {
 }
 
 impl StateSaver for HuffmanArchiver {
-    fn save_state(self) -> Vec<u8> {
+    fn save_state(self) -> Result<Vec<u8>> {
         let mut result = Vec::new();
 
         #[allow(unused_mut)]
@@ -102,10 +117,10 @@ impl StateSaver for HuffmanArchiver {
         }
 
         result.extend_from_slice(&self.mean_code_length.to_le_bytes());
-        result
+        Ok(result)
     }
 
-    fn load_state(mut state: Vec<u8>) -> Self {
+    fn load_state(mut state: Vec<u8>) -> Result<Self> {
         // Ensure there are at least 2 bytes to extract the mean_code_length
         assert!(
             state.len() >= 2,
@@ -119,31 +134,22 @@ impl StateSaver for HuffmanArchiver {
         // Truncate the state to remove the mean_code_length bytes
         state.truncate(state.len() - 2);
 
-        let mut entity = Self {
-            word_code: Self::build_word_code(&state),
-            mean_code_length,
-            decoder: None,
-        };
-
-        entity.decoder = Some((&entity).into());
-        entity
+        Ok(Self::_new(mean_code_length, Self::build_word_code(&state)))
     }
 }
 
-impl Into<HuffmanDecoder> for &HuffmanArchiver {
+impl TryInto<HuffmanDecoder> for &HuffmanArchiver {
     /// Превращает Хаффман кодировщик в декодировщик!
-    fn into(self) -> HuffmanDecoder {
-        // TODO: Построить дерево
-        todo!()
+    fn try_into(self) -> Result<HuffmanDecoder, Self::Error> {
+        HuffmanDecoder::try_from(&self.word_code)
     }
+
+    type Error = anyhow::Error;
 }
 
 impl Decoder for HuffmanArchiver {
     fn decode_string(&self, bit_string: &str) -> Result<Vec<u8>> {
-        self.decoder
-            .as_ref()
-            .context("Failed to decode string: Huffman decoder does not set.")?
-            .decode_string(bit_string)
+        self.decoder()?.decode_string(bit_string)
     }
 }
 
@@ -174,13 +180,14 @@ mod tests {
 
     #[test]
     fn test_save_and_load_huffman_archiver() {
+        let word_code = HashMap::from([(1, "1".into()), (2, "11".into()), (3, "1110".into())]);
         let archiver = HuffmanArchiver {
-            word_code: HashMap::from([(1, "1".into()), (2, "11".into()), (3, "1110".into())]),
+            word_code: word_code,
             mean_code_length: 100,
-            decoder: None,
+            decoder: RefCell::new(None),
         };
 
-        let state = archiver.save_state();
+        let state = archiver.save_state().unwrap();
         assert_eq!(
             state,
             vec![
@@ -192,7 +199,7 @@ mod tests {
             ]
         );
 
-        let archiver = HuffmanArchiver::load_state(state);
+        let archiver = HuffmanArchiver::load_state(state).unwrap();
 
         assert_eq!(archiver.mean_code_length, 100);
         assert_eq!(

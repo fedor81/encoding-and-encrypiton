@@ -47,7 +47,7 @@ where
             .context("Failed to read encoded part")?;
 
         // Декодируем файл
-        let decoder = Self::load_state(state);
+        let decoder = Self::load_state(state)?;
         decoder.decode_and_write(&bytes, destination)
     }
 

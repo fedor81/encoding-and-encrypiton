@@ -61,7 +61,7 @@ where
 {
     fn encode_file(self, target: &PathBuf, destination: &PathBuf) -> Result<()> {
         let encoded_file = Encoder::encode_file(&self, target);
-        let state = self.save_state();
+        let state = self.save_state()?;
         let mut file = File::create(destination).context("Failed to create file")?;
 
         // Записываем размер состояния, состояние и сжатый файл
