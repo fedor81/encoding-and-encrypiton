@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::{
     fs::File,
     io::{Read, Write},
-    path::PathBuf,
+    path::Path,
 };
 
 use super::{StateSaver, utils::convert_to_string};
@@ -17,32 +17,23 @@ pub trait Decoder {
     }
 }
 
+impl<T> FileDecoder for T where T: Decoder + StateSaver {}
+
 pub trait FileDecoder
 where
     Self: Decoder + StateSaver + Sized,
 {
-    fn decode_file(target: &PathBuf, destination: &PathBuf) -> Result<()> {
+    fn decode_file<P: AsRef<Path>>(target: P, destination: P) -> Result<()> {
         let mut file = File::open(target).context("Failed to create file")?;
         let file_size = match file.metadata() {
             Ok(metadata) => metadata.len() as usize,
             Err(_) => 0,
         };
 
-        // Читаем размер состояния (usize)
-        let mut state_size = [0; std::mem::size_of::<usize>()];
-        file.read_exact(&mut state_size)
-            .context("Failed to read state size")?;
-        let state_size = usize::from_le_bytes(state_size);
-
-        assert!(state_size > 0);
-
-        // Читаем состояние
-        let mut state = vec![0; state_size];
-        file.read_exact(&mut state)
-            .context("Failed to read state")?;
+        let state = Self::read_state(&mut file)?;
 
         // Читаем закодированную часть
-        let mut bytes = Vec::with_capacity(file_size - state_size - std::mem::size_of::<usize>());
+        let mut bytes = vec![0; file_size - state.len() - std::mem::size_of::<usize>()];
         file.read_exact(&mut bytes)
             .context("Failed to read encoded part")?;
 
@@ -51,7 +42,7 @@ where
         decoder.decode_and_write(&bytes, destination)
     }
 
-    fn decode_and_write(&self, bytes: &[u8], destination: &PathBuf) -> Result<()> {
+    fn decode_and_write<P: AsRef<Path>>(&self, bytes: &[u8], destination: P) -> Result<()> {
         let mut decoded = self.decode_bytes(&bytes).context("Failed to decode")?;
 
         // Записываем результат

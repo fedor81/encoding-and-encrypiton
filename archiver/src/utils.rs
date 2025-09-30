@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use std::{
     collections::HashMap,
-    fs::File,
-    io::{BufReader, Read},
-    path::PathBuf,
+    fs::{self, File},
+    io::{BufRead, BufReader, Read},
+    path::{Path, PathBuf},
 };
 
 use super::FrequencyMap;
@@ -80,6 +80,164 @@ pub fn convert_to_string(bytes: &[u8]) -> String {
         }
     }
     result
+}
+
+pub fn cmp_files_text<P: AsRef<Path>>(actual_path: P, expected_path: P) {
+    let actual_path = actual_path.as_ref();
+    let expected_path = expected_path.as_ref();
+
+    // Открытие файлов
+    let actual_file = File::open(actual_path)
+        .unwrap_or_else(|_| panic!("Failed to open actual file: {}", actual_path.display()));
+    let expected_file = File::open(expected_path)
+        .unwrap_or_else(|_| panic!("Failed to open expected file: {}", expected_path.display()));
+
+    let actual_reader = BufReader::new(actual_file);
+    let expected_reader = BufReader::new(expected_file);
+
+    for (line_num, (actual_line, expected_line)) in actual_reader
+        .lines()
+        .zip(expected_reader.lines())
+        .enumerate()
+    {
+        let line_num = line_num + 1; // Нумерация строк с 1
+
+        let actual = actual_line.unwrap_or_else(|err| {
+            panic!(
+                "Failed to read line {}, error: {}, from actual file: {}\n",
+                line_num,
+                err,
+                actual_path.display()
+            )
+        });
+        let expected = expected_line.unwrap_or_else(|err| {
+            panic!(
+                "- Failed to read line {}, error: {}, from expected file: {}\n",
+                line_num,
+                err,
+                expected_path.display(),
+            )
+        });
+
+        if actual != expected {
+            panic!(
+                "Files differ at line {}:\n\
+                 File: {}\n\
+                 Expected: {:?}\n\
+                 Actual:   {:?}\n",
+                line_num,
+                actual_path.display(),
+                expected,
+                actual
+            );
+        }
+    }
+
+    // Проверяем что в одном файле не осталось лишних строк
+    let actual_file = File::open(actual_path).expect("Failed to reopen actual file");
+    let expected_file = File::open(expected_path).expect("Failed to reopen expected file");
+
+    let actual_lines: Vec<_> = BufReader::new(actual_file).lines().collect();
+    let expected_lines: Vec<_> = BufReader::new(expected_file).lines().collect();
+
+    assert_eq!(
+        actual_lines.len(),
+        expected_lines.len(),
+        "Files have different number of lines:\n  actual: {} lines\n  expected: {} lines",
+        actual_lines.len(),
+        expected_lines.len(),
+    );
+
+    println!(
+        "✅ Text files are identical: {} == {}",
+        actual_path.display(),
+        expected_path.display()
+    );
+}
+
+pub fn cmp_files<P: AsRef<Path>>(actual_path: P, expected_path: P) {
+    let actual_path = actual_path.as_ref();
+    let expected_path = expected_path.as_ref();
+
+    // Проверка существования файлов
+    if !actual_path.exists() {
+        panic!("Actual file does not exist: {}", actual_path.display());
+    }
+    if !expected_path.exists() {
+        panic!("Expected file does not exist: {}", expected_path.display());
+    }
+
+    // Сравнение метаданных
+    let actual_metadata = fs::metadata(actual_path).unwrap_or_else(|_| {
+        panic!(
+            "Failed to get metadata for actual file: {}",
+            actual_path.display()
+        )
+    });
+    let expected_metadata = fs::metadata(expected_path).unwrap_or_else(|_| {
+        panic!(
+            "Failed to get metadata for expected file: {}",
+            expected_path.display()
+        )
+    });
+
+    assert_eq!(
+        actual_metadata.len(),
+        expected_metadata.len(),
+        "File sizes differ:\n  actual: {} bytes ({})\n  expected: {} bytes ({})",
+        actual_metadata.len(),
+        actual_path.display(),
+        expected_metadata.len(),
+        expected_path.display()
+    );
+
+    // Открытие файлов
+    let mut actual_file = File::open(actual_path)
+        .unwrap_or_else(|_| panic!("Failed to open actual file: {}", actual_path.display()));
+    let mut expected_file = File::open(expected_path)
+        .unwrap_or_else(|_| panic!("Failed to open expected file: {}", expected_path.display()));
+
+    // Сравнение побайтово (более надежно чем построчно)
+    let mut actual_buf = Vec::new();
+    let mut expected_buf = Vec::new();
+
+    actual_file
+        .read_to_end(&mut actual_buf)
+        .unwrap_or_else(|_| panic!("Failed to read actual file: {}", actual_path.display()));
+    expected_file
+        .read_to_end(&mut expected_buf)
+        .unwrap_or_else(|_| panic!("Failed to read expected file: {}", expected_path.display()));
+
+    // Поиск первого отличающегося байта
+    for (i, (actual_byte, expected_byte)) in actual_buf.iter().zip(expected_buf.iter()).enumerate()
+    {
+        if actual_byte != expected_byte {
+            panic!(
+                "Files differ at byte {}:\n  actual: 0x{:02x} ({})\n  expected: 0x{:02x} ({})\nFile: {}",
+                i,
+                actual_byte,
+                if *actual_byte >= 32 && *actual_byte <= 126 {
+                    format!("'{}'", *actual_byte as char)
+                } else {
+                    "non-printable".to_string()
+                },
+                expected_byte,
+                if *expected_byte >= 32 && *expected_byte <= 126 {
+                    format!("'{}'", *expected_byte as char)
+                } else {
+                    "non-printable".to_string()
+                },
+                actual_path.display()
+            );
+        }
+    }
+
+    // Если дошли до конца - файлы идентичны
+    println!(
+        "✅ Files are identical: {} == {}",
+        actual_path.display(),
+        expected_path.display()
+    );
 }
 
 #[cfg(test)]

@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::{
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap, VecDeque},
+    fmt,
+};
 
-#[derive(Debug)]
 pub enum HuffmanTree {
     Leaf {
         probability: f64,
@@ -144,7 +146,7 @@ impl HuffmanTree {
         }
     }
 
-    pub fn is_terminal(&self) -> bool {
+    pub fn is_leaf(&self) -> bool {
         matches!(self, HuffmanTree::Leaf { .. })
     }
 
@@ -239,11 +241,82 @@ impl HuffmanTree {
             }
         }
     }
+
+    fn fmt_with_indent(&self, f: &mut fmt::Formatter<'_>, indent: usize) -> fmt::Result {
+        let indent_str = "  ".repeat(indent);
+
+        match self {
+            HuffmanTree::Leaf {
+                word,
+                index,
+                probability,
+            } => {
+                write!(
+                    f,
+                    "Leaf {{ word: {}, index: {}, prob: {:.4} }}",
+                    word, index, probability
+                )
+            }
+            HuffmanTree::Node {
+                probability,
+                left,
+                right,
+                count_codes,
+            } => {
+                writeln!(f, "Node {{")?;
+                writeln!(f, "{}  probability: {:.4}", indent_str, probability)?;
+                writeln!(f, "{}  count_codes: {}", indent_str, count_codes)?;
+                write!(f, "{}  left: ", indent_str)?;
+                left.fmt_with_indent(f, indent + 1)?;
+                writeln!(f, ",")?;
+                write!(f, "{}  right: ", indent_str)?;
+                right.fmt_with_indent(f, indent + 1)?;
+                write!(f, "\n{}}}", indent_str)
+            }
+        }
+    }
 }
 
 impl PartialEq for HuffmanTree {
     fn eq(&self, other: &Self) -> bool {
-        self.probability() == other.probability()
+        match (self, other) {
+            (
+                Self::Node {
+                    probability: self_probability,
+                    left: self_left,
+                    right: self_right,
+                    count_codes: self_count_codes,
+                },
+                Self::Node {
+                    probability: other_probability,
+                    left: other_left,
+                    right: other_right,
+                    count_codes: other_count_codes,
+                },
+            ) => {
+                self_count_codes == other_count_codes
+                    && self_probability == other_probability
+                    && self_left.eq(other_left)
+                    && self_right.eq(other_right)
+            }
+            (
+                Self::Leaf {
+                    probability: self_probability,
+                    index: self_index,
+                    word: self_word,
+                },
+                Self::Leaf {
+                    probability: other_probability,
+                    index: other_index,
+                    word: other_word,
+                },
+            ) => {
+                self_probability == other_probability
+                    && self_index == other_index
+                    && self_word == other_word
+            }
+            (_, _) => false,
+        }
     }
 }
 
@@ -261,34 +334,59 @@ impl Ord for HuffmanTree {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::HuffmanArchiver;
+impl fmt::Debug for HuffmanTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_with_indent(f, 0)
+    }
+}
 
+#[cfg(test)]
+pub(crate) mod tests {
     use super::*;
+
+    pub fn new_test_tree() -> HuffmanTree {
+        HuffmanTree::Node {
+            probability: 0.0,
+            left: HuffmanTree::new_leaf(0.0, 0, 0).into(),
+            right: HuffmanTree::Node {
+                probability: 0.0,
+                right: HuffmanTree::new_leaf(0.0, 1, 1).into(),
+                left: HuffmanTree::Node {
+                    probability: 0.0,
+                    left: HuffmanTree::new_leaf(0.0, 2, 2).into(),
+                    right: HuffmanTree::Node {
+                        probability: 0.0,
+                        left: HuffmanTree::new_leaf(0.0, 3, 3).into(),
+                        right: HuffmanTree::new_leaf(0.0, 4, 4).into(),
+                        count_codes: 0,
+                    }
+                    .into(),
+                    count_codes: 0,
+                }
+                .into(),
+                count_codes: 0,
+            }
+            .into(),
+            count_codes: 5,
+        }
+    }
+
+    pub fn new_test_codes() -> HashMap<u8, String> {
+        HashMap::from([
+            (0u8, "0".into()),
+            (1, "11".into()),
+            (2, "100".into()),
+            (3, "1010".into()),
+            (4, "1011".into()),
+        ])
+    }
 
     #[test]
     fn test_restore_from_word_code() {
-        // TODO:
-
-        let word_code = HashMap::from([(0u8, "0".into()), (1, "10".into()), (2, "11".into())]);
+        let word_code = new_test_codes();
         let tree = HuffmanTree::restore_from_word_code(&word_code).unwrap();
-        assert_eq!(
-            tree,
-            HuffmanTree::Node {
-                probability: 0.0,
-                left: HuffmanTree::new_leaf(0.0, 0, 0).into(),
-                right: HuffmanTree::Node {
-                    probability: 0.0,
-                    left: HuffmanTree::new_leaf(0.0, 1, 1).into(),
-                    right: HuffmanTree::new_leaf(0.0, 2, 2).into(),
-                    count_codes: 2,
-                }
-                .into(),
-                count_codes: 3
-            }
-        );
 
         assert_eq!(tree.build_word_code(), word_code);
+        assert_eq!(tree, new_test_tree());
     }
 }

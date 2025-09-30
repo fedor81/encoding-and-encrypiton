@@ -55,6 +55,8 @@ pub trait Encoder {
     }
 }
 
+impl<T> FileEncoder for T where T: Encoder + StateSaver {}
+
 pub trait FileEncoder
 where
     Self: Encoder + StateSaver + Sized,
@@ -65,13 +67,9 @@ where
         let mut file = File::create(destination).context("Failed to create file")?;
 
         // Записываем размер состояния, состояние и сжатый файл
-        file.write_all(state.len().to_le_bytes().as_slice())
-            .context("Failed to write state length to file")?;
-        file.write_all(&state).context("Failed to write state")?;
+        Self::write_state(&state, &mut file)?;
         file.write_all(&encoded_file?)
             .context("Failed to write encoded file")?;
         Ok(())
     }
 }
-
-impl<T> FileEncoder for T where T: Encoder + StateSaver {}

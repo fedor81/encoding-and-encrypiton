@@ -1,8 +1,6 @@
-use std::path::PathBuf;
+use archiver::{FileDecoder, HuffmanArchiver, io::read_filepath};
 
-use archiver::{HuffmanArchiver, io::read_filepath};
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 fn main() -> Result<()> {
     let target = read_filepath(&"Please provide the location of the file you wish to extract:")?;
@@ -10,34 +8,45 @@ fn main() -> Result<()> {
         &"Please specify the location where you want to save the outcome of the operation:",
     )?;
 
-    extract(target, destination)
-}
-
-/// Extracts the file from the archive
-fn extract(target: PathBuf, destination: PathBuf) -> Result<()> {
-    println!("Finish!");
-    Ok(())
+    HuffmanArchiver::decode_file(&target, &destination)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use archiver::{FileEncoder, create_probabilities_map, io::path_to_absolute};
-    use std::path::PathBuf;
+    use archiver::{
+        FileDecoder, HuffmanArchiver, archive_by_haffman, io::path_to_absolute,
+        utils::cmp_files_text,
+    };
+    use std::{fs, path::PathBuf};
 
     #[test]
-    fn test_main() {
-        let target = path_to_absolute(PathBuf::from("../README.md")).unwrap();
-        let destination = path_to_absolute(PathBuf::from("../README.huff")).unwrap();
+    fn test_huffman_decoder() {
+        let original = path_to_absolute(PathBuf::from("./src/lib.rs")).unwrap();
+        let archived = path_to_absolute(PathBuf::from("decoder_test.huff")).unwrap();
+        let extracted = archived.with_extension("extract");
+
+        // Сборка мусора, если файлы существуют
+        if fs::remove_file(&archived).is_ok() {
+            println!("- Removed archived file: {}\n", archived.to_str().unwrap());
+        };
+        if fs::remove_file(&extracted).is_ok() {
+            println!(
+                "- Removed extracted file: {}\n",
+                extracted.to_str().unwrap()
+            );
+        }
 
         // Архивация файла
-        let probabilities = create_probabilities_map(&target).unwrap();
-        let encoder = HuffmanArchiver::new(probabilities);
-        encoder.encode_file(&target, &destination).unwrap();
+        archive_by_haffman(&original, &archived).expect("Failed to archive file");
 
-        // TODO: Распаковка файла
+        // Распаковка файла
+        HuffmanArchiver::decode_file(&archived, &extracted).expect("Failed to extract file");
 
-        // TODO: Сравнение
+        // Проверка
+        cmp_files_text(&original, &extracted);
+
+        // Сборка мусора
+        fs::remove_file(&archived).expect("Failed to remove archived file");
+        fs::remove_file(&extracted).expect("Failed to remove extracted file");
     }
 }

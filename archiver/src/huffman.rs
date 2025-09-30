@@ -18,6 +18,16 @@ pub struct HuffmanArchiver {
     decoder: RefCell<Option<HuffmanDecoder>>,
 }
 
+impl Clone for HuffmanArchiver {
+    fn clone(&self) -> Self {
+        Self {
+            word_code: self.word_code.clone(),
+            mean_code_length: self.mean_code_length.clone(),
+            decoder: RefCell::new(None),
+        }
+    }
+}
+
 impl HuffmanArchiver {
     pub fn new(words_probabilities: HashMap<u8, f64>) -> Self {
         let codes = Self::build_optimal_codes_from_hashmap(words_probabilities);
@@ -155,7 +165,21 @@ impl Decoder for HuffmanArchiver {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs::File,
+        io::{Read, Write},
+    };
+
     use super::*;
+
+    fn new_simple_archiver() -> HuffmanArchiver {
+        let word_code = HashMap::from([(1, "1".into()), (2, "11".into()), (3, "1110".into())]);
+        HuffmanArchiver {
+            word_code: word_code,
+            mean_code_length: 100,
+            decoder: RefCell::new(None),
+        }
+    }
 
     #[test]
     fn test_build_optimal_codes() {
@@ -180,12 +204,8 @@ mod tests {
 
     #[test]
     fn test_save_and_load_huffman_archiver() {
-        let word_code = HashMap::from([(1, "1".into()), (2, "11".into()), (3, "1110".into())]);
-        let archiver = HuffmanArchiver {
-            word_code: word_code,
-            mean_code_length: 100,
-            decoder: RefCell::new(None),
-        };
+        let archiver = new_simple_archiver();
+        let word_code = archiver.word_code.clone();
 
         let state = archiver.save_state().unwrap();
         assert_eq!(
@@ -202,9 +222,41 @@ mod tests {
         let archiver = HuffmanArchiver::load_state(state).unwrap();
 
         assert_eq!(archiver.mean_code_length, 100);
+        assert_eq!(archiver.word_code, word_code);
+    }
+
+    #[test]
+    fn test_save_and_load_huffman_archiver_to_file() {
+        let expected_archiver = new_simple_archiver();
+        let expected_state = expected_archiver
+            .clone()
+            .save_state()
+            .expect("Failed to save state");
+
+        let actual_state;
+        let filename = "test_save_and_load_huffman_archiver_to_file.huff";
+        std::fs::remove_file(filename).ok();
+
+        {
+            let mut file = File::create(filename).expect("Failed to create file");
+            HuffmanArchiver::write_state(&expected_state, &mut file).unwrap();
+        }
+
+        {
+            let mut file = File::open(filename).expect("Failed to open file");
+            actual_state = HuffmanArchiver::read_state(&mut file).unwrap();
+        }
+
+        assert_eq!(expected_state, actual_state);
+
+        let actual_archiver = HuffmanArchiver::load_state(actual_state).unwrap();
+
+        assert_eq!(actual_archiver.word_code, expected_archiver.word_code);
         assert_eq!(
-            archiver.word_code,
-            HashMap::from([(1, "1".into()), (2, "11".into()), (3, "1110".into())]),
+            actual_archiver.mean_code_length,
+            expected_archiver.mean_code_length
         );
+
+        std::fs::remove_file(filename).ok();
     }
 }
