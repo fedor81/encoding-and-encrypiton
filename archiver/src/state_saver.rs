@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{Context, Result};
 
-pub(crate) trait StateSaver
+pub trait StateSaver
 where
     Self: Sized,
 {

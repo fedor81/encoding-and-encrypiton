@@ -1,5 +1,10 @@
 use anyhow::{Context, Result};
-use std::{env, path::PathBuf, str::FromStr};
+use humansize::{DECIMAL, format_size};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use crate::Codes;
 
@@ -20,6 +25,25 @@ pub fn print_codes(name: &str, codes: &Codes) {
         codes.statistical_compression_ratio()
     );
     print!("\n");
+}
+
+pub fn print_sizes<P: AsRef<Path>>(target: P, destination: P) -> Result<()> {
+    let original_size = std::fs::metadata(&target)?.len();
+    let archived_size = std::fs::metadata(&destination)?.len();
+
+    println!(
+        "\nOriginal file size: {}",
+        format_size(original_size, DECIMAL)
+    );
+    println!(
+        "Archived file size: {}",
+        format_size(archived_size, DECIMAL)
+    );
+    println!(
+        "Compression ratio: {:.2}%",
+        (archived_size as f64 / original_size as f64) * 100.0
+    );
+    Ok(())
 }
 
 pub fn read_vec_numbers<T>(output: &str) -> Vec<T>
@@ -53,7 +77,7 @@ pub fn read_filepath(output: &str) -> Result<PathBuf> {
     }
 
     let path = PathBuf::from(path_str);
-    path_to_absolute(path)
+    path_to_absolute(path).context("Failed to convert to absolute path")
 }
 
 pub fn path_to_absolute(path: PathBuf) -> Result<PathBuf> {

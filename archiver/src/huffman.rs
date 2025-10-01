@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, fmt, path::Path};
 
 use super::{
     Codes, CodesBuilder, Encoder, StateSaver,
     utils::{convert_to_bytes, sort_words_and_probabilities},
 };
-use crate::{Decoder, huffman::huffman_tree::HuffmanTree};
+use crate::{Decoder, FileEncoder, create_probabilities_map, huffman::huffman_tree::HuffmanTree};
 use decoder::HuffmanDecoder;
 
 mod decoder;
@@ -40,6 +40,22 @@ impl HuffmanArchiver {
             word_code,
             decoder: RefCell::new(None),
         }
+    }
+
+    /// Archives the file in the specified location.
+    pub fn archive<P>(target: P, destination: P) -> Result<()>
+    where
+        P: AsRef<Path> + fmt::Debug,
+    {
+        let target = &target.as_ref().to_path_buf();
+        let destination = &destination.as_ref().to_path_buf();
+
+        let probabilities =
+            create_probabilities_map(target).context("Failed to create probabilities map")?;
+        let encoder = Self::new(probabilities);
+
+        <Self as FileEncoder>::encode_file(encoder, target, destination)?;
+        Ok(())
     }
 
     /// If decoder is not initialized, initialize it and return
@@ -165,10 +181,7 @@ impl Decoder for HuffmanArchiver {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs::File,
-        io::{Read, Write},
-    };
+    use std::fs::File;
 
     use super::*;
 

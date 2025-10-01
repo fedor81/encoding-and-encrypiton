@@ -25,25 +25,38 @@ where
 {
     fn decode_file<P: AsRef<Path>>(target: P, destination: P) -> Result<()> {
         let mut file = File::open(target).context("Failed to create file")?;
-        let file_size = match file.metadata() {
-            Ok(metadata) => metadata.len() as usize,
-            Err(_) => 0,
-        };
 
+        // Восстанавливаем состояние кодека
         let state = Self::read_state(&mut file)?;
 
-        // Читаем закодированную часть
-        let mut bytes = vec![0; file_size - state.len() - std::mem::size_of::<usize>()];
-        file.read_exact(&mut bytes)
+        // Читаем оригинальный размер файла (в байтах), записанный при кодировании
+        let mut original_size_buf = [0u8; std::mem::size_of::<usize>()];
+        file.read_exact(&mut original_size_buf)
+            .context("Failed to read original size")?;
+        let original_size = usize::from_le_bytes(original_size_buf);
+
+        // Читаем оставшуюся закодированную часть до конца файла
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)
             .context("Failed to read encoded part")?;
 
         // Декодируем файл
         let decoder = Self::load_state(state)?;
-        decoder.decode_and_write(&bytes, destination)
+        decoder.decode_and_write(&bytes, destination, original_size)
     }
 
-    fn decode_and_write<P: AsRef<Path>>(&self, bytes: &[u8], destination: P) -> Result<()> {
+    fn decode_and_write<P: AsRef<Path>>(
+        &self,
+        bytes: &[u8],
+        destination: P,
+        original_size: usize,
+    ) -> Result<()> {
         let mut decoded = self.decode_bytes(&bytes).context("Failed to decode")?;
+
+        // Удаляем возможные лишние байты, появившиеся из-за паддинга при кодировании
+        if decoded.len() > original_size {
+            decoded.truncate(original_size);
+        }
 
         // Записываем результат
         let mut target_file = File::create(destination).context("Failed to create file")?;

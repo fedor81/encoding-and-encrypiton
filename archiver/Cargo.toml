@@ -17,3 +17,4 @@ path = "src/bin/huffman_decoder.rs"
 
 [dependencies]
 anyhow = "1.0.100"
+humansize = "2.1.3"

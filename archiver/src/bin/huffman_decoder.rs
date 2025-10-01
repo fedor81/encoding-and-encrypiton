@@ -13,10 +13,7 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use archiver::{
-        FileDecoder, HuffmanArchiver, archive_by_haffman, io::path_to_absolute,
-        utils::cmp_files_text,
-    };
+    use archiver::{FileDecoder, HuffmanArchiver, io::path_to_absolute, utils::cmp_files};
     use std::{fs, path::PathBuf};
 
     #[test]
@@ -37,13 +34,13 @@ mod tests {
         }
 
         // Архивация файла
-        archive_by_haffman(&original, &archived).expect("Failed to archive file");
+        HuffmanArchiver::archive(&original, &archived).expect("Failed to archive file");
 
         // Распаковка файла
         HuffmanArchiver::decode_file(&archived, &extracted).expect("Failed to extract file");
 
-        // Проверка
-        cmp_files_text(&original, &extracted);
+        // Проверка (побайтово, без артефактов перевода строк)
+        cmp_files(&original, &extracted);
 
         // Сборка мусора
         fs::remove_file(&archived).expect("Failed to remove archived file");

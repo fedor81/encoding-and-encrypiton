@@ -1,9 +1,4 @@
-use anyhow::{Context, Result};
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    path::{self, Path},
-};
+use std::collections::HashMap;
 
 mod codes;
 mod decoder;
@@ -43,19 +38,3 @@ where
 }
 
 impl<T> FileArchiver for T where T: FileEncoder + FileDecoder {}
-
-/// Archives the file in the specified location.
-pub fn archive_by_haffman<P>(target: P, destination: P) -> Result<()>
-where
-    P: AsRef<Path> + Debug,
-{
-    let target = &target.as_ref().to_path_buf();
-    let destination = &destination.as_ref().to_path_buf();
-
-    let probabilities =
-        create_probabilities_map(target).context("Failed to create probabilities map")?;
-    let encoder = HuffmanArchiver::new(probabilities);
-
-    encoder.encode_file(target, destination)?;
-    Ok(())
-}
