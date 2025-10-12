@@ -1,9 +1,13 @@
+mod fast_gf256;
 mod simple_gf256;
 
+pub use fast_gf256::FastGF256;
 pub use simple_gf256::SimpleGF256;
 
 /// Примитивный полином: x⁸ + x⁴ + x³ + x² + 1 = 0x11D.
-/// Возьмем младшие степени: x⁴ + x³ + x² + 1 = 0x1B.
+const PRIMITIVE_POLY_FULL: u16 = 0x11D;
+
+/// Возьмем младшие степени примитивного полинома: x⁴ + x³ + x² + 1 = 0x1B.
 const PRIMITIVE_POLY: u8 = 0x1B;
 
 pub trait GF256 {
