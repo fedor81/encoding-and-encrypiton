@@ -2,15 +2,8 @@ use super::{GF256, PRIMITIVE_POLY};
 
 pub struct SimpleGF256 {}
 
-impl GF256 for SimpleGF256 {
-    fn _div(&self, a: u8, b: u8) -> u8 {
-        let b_inverse = self.inverse(b);
-        self.mul(a, b_inverse)
-    }
-
-    fn _mul(&self, a: u8, b: u8) -> u8 {
-        let mut a = a;
-        let mut b = b;
+impl SimpleGF256 {
+    pub fn mul(mut a: u8, mut b: u8) -> u8 {
         let mut result = 0;
 
         while a > 0 {
@@ -27,19 +20,32 @@ impl GF256 for SimpleGF256 {
         result
     }
 
-    fn _pow(&self, a: u8, n: u8) -> u8 {
-        let mut a = a;
+    pub fn pow(mut a: u8, mut n: u8) -> u8 {
         let mut result = 1;
-        let mut pow = n as u8;
 
-        while pow > 0 {
-            if pow & 1 > 0 {
-                result = self.mul(result, a);
+        while n > 0 {
+            if n & 1 > 0 {
+                result = Self::mul(result, a);
             }
-            a = self.mul(a, a);
-            pow >>= 1;
+            a = Self::mul(a, a);
+            n >>= 1;
         }
         result
+    }
+}
+
+impl GF256 for SimpleGF256 {
+    fn _div(&self, a: u8, b: u8) -> u8 {
+        let b_inverse = self.inverse(b);
+        self.mul(a, b_inverse)
+    }
+
+    fn _mul(&self, a: u8, b: u8) -> u8 {
+        Self::mul(a, b)
+    }
+
+    fn _pow(&self, a: u8, n: u8) -> u8 {
+        Self::pow(a, n)
     }
 
     /// Найти a^(-1) в поле GF(256) можно как a^(254).
