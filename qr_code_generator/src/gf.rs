@@ -1,14 +1,18 @@
+//! Примитивный элемент поля GF(256) — это элемент, который порождает мультипликативную группу поля
+//! GF(256), то есть при возведении его в степени от 1 до 255 (исключая 0) можно получить все ненулевые
+//! элементы этого поля.
+
 mod fast_gf256;
 mod simple_gf256;
 
 pub use fast_gf256::FastGF256;
 pub use simple_gf256::SimpleGF256;
 
-/// Примитивный полином: x⁸ + x⁴ + x³ + x² + 1 = 0x11D.
-const PRIMITIVE_POLY_FULL: u16 = 0x11D;
+/// Примитивный полином: x⁸ + x⁴ + x³ + x² + 1 = 0x11D или 285 в десятичной.
+pub const PRIMITIVE_POLY_FULL: u16 = 0x11D;
 
-/// Возьмем младшие степени примитивного полинома: x⁴ + x³ + x² + 1 = 0x1B.
-const PRIMITIVE_POLY: u8 = 0x1B;
+/// Возьмем младшие степени примитивного полинома: x⁴ + x³ + x² + 1 = 0x1B или 27 в десятичной.
+pub const PRIMITIVE_POLY: u8 = 0x1B;
 
 pub trait GF256 {
     fn _div(&self, a: u8, b: u8) -> u8;
@@ -57,6 +61,58 @@ pub trait GF256 {
     }
     fn sub(&self, a: u8, b: u8) -> u8 {
         a ^ b
+    }
+
+    /// Складывает многочлены с учетом правил сложения GF256
+    fn add_poly(&self, a: &[u8], b: &[u8]) -> Vec<u8> {
+        let len = a.len().max(b.len());
+        let mut result = vec![0u8; len];
+
+        for i in 0..len {
+            let a_val = a.get(i).copied().unwrap_or_default();
+            let b_val = b.get(i).copied().unwrap_or_default();
+            result[i] = self.add(a_val, b_val);
+        }
+
+        result
+    }
+
+    /// Умножает многочлены с учетом правил GF256
+    fn mul_poly(&self, a: &[u8], b: &[u8]) -> Vec<u8> {
+        let mut result = vec![0u8; a.len() + b.len() - 1];
+
+        for (i, &coef_a) in a.iter().enumerate() {
+            for (j, &coef_b) in b.iter().enumerate() {
+                let product = self.mul(coef_a, coef_b);
+                result[i + j] = self.add(result[i + j], product);
+            }
+        }
+
+        result
+    }
+
+    /// Функция для вычисления значения полинома в точке
+    fn eval_poly(&self, poly: &[u8], x: u8) -> u8 {
+        let mut result = 0u8;
+
+        for (i, &coef) in poly.iter().enumerate() {
+            let term = self.mul(coef, self.pow(x, i as u8));
+            result = self.add(result, term);
+        }
+
+        result
+    }
+
+    /// Умножает коэффициенты многочлена на скаляр
+    fn scale_poly(&self, poly: &[u8], scalar: u8) -> Vec<u8> {
+        poly.iter().map(|&coef| self.mul(coef, scalar)).collect()
+    }
+
+    /// Сдвигает многочлен на n
+    fn shift_poly(&self, poly: &[u8], shift: usize) -> Vec<u8> {
+        let mut result = vec![0u8; shift];
+        result.extend_from_slice(poly);
+        result
     }
 }
 

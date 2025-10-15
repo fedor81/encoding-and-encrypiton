@@ -1,4 +1,4 @@
-use super::{GF256, PRIMITIVE_POLY_FULL};
+use super::{GF256, PRIMITIVE_POLY, PRIMITIVE_POLY_FULL};
 
 pub struct FastGF256 {
     exp_table: [u8; 512],
@@ -18,8 +18,8 @@ impl FastGF256 {
 
             x <<= 1;
 
-            // 0x100 - 0b1_0000_0000
-            if x & 0x100 != 0 {
+            // 0x100 или 0b1_0000_0000 или 256
+            if x >= 256 {
                 x ^= PRIMITIVE_POLY_FULL;
             }
         }
@@ -32,6 +32,10 @@ impl FastGF256 {
             exp_table,
             log_table,
         }
+    }
+
+    pub fn pow_primitive_poly(&self, n: u8) -> u8 {
+        self.exp_table[n as usize]
     }
 }
 
