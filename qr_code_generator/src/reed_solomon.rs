@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::{Coder, Poly, gf::GF256};
+use crate::{Coder, Poly, RefPoly, gf::GF256};
 
 /// k – число информационных символов, подлежащих кодированию,
 /// n – число кодовых символов в кодируемом блоке.
@@ -33,7 +33,7 @@ where
     /// `g(x) = (x + a^1)(x + a^2)...(x + a^(d-1))`
     ///
     /// где `a` - примитивный элемент, `d = n - k + 1` - расстояние Хэмминга.
-    fn build_gen_poly(gf: &T, control_count: usize) -> Vec<u8> {
+    fn build_gen_poly(gf: &T, control_count: usize) -> Poly {
         let mut gen_poly = vec![1];
 
         // Умножаем на (x + α^i)
@@ -58,14 +58,14 @@ impl<T> Coder for ReedSolomon<T>
 where
     T: GF256,
 {
-    fn encode(&self, data: &[u8]) -> Result<Vec<u8>> {
+    fn encode(&self, data: RefPoly) -> Result<Poly> {
         if data.len() + self.control_count > 255 {
             anyhow::bail!("Message too long and cannot be encoded with GF256");
         }
         todo!()
     }
 
-    fn decode(&self, data: &[u8]) -> Result<Vec<u8>> {
+    fn decode(&self, data: RefPoly) -> Result<Poly> {
         if data.len() > 255 {
             anyhow::bail!("Message too long and cannot be decoded with GF256");
         }

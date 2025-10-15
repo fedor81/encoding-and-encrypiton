@@ -14,7 +14,7 @@ fn test_build_gen_poly() {
     }
 }
 
-fn test_generator_poly_properties(gf: &FastGF256, gen_poly: &[u8], control: usize) {
+fn test_generator_poly_properties(gf: &FastGF256, gen_poly: RefPoly, control: usize) {
     // 1. Проверяем длину полинома
     assert_eq!(
         gen_poly.len(),

@@ -11,3 +11,4 @@ trait Coder {
 }
 
 type Poly = Vec<u8>;
+type RefPoly<'a> = &'a [u8];

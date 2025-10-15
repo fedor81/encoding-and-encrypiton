@@ -2,6 +2,8 @@
 //! GF(256), то есть при возведении его в степени от 1 до 255 (исключая 0) можно получить все ненулевые
 //! элементы этого поля.
 
+use crate::{Poly, RefPoly};
+
 mod fast_gf256;
 mod simple_gf256;
 
@@ -64,7 +66,7 @@ pub trait GF256 {
     }
 
     /// Складывает многочлены с учетом правил сложения GF256
-    fn add_poly(&self, a: &[u8], b: &[u8]) -> Vec<u8> {
+    fn add_poly(&self, a: RefPoly, b: RefPoly) -> Poly {
         let len = a.len().max(b.len());
         let mut result = vec![0u8; len];
 
@@ -78,7 +80,7 @@ pub trait GF256 {
     }
 
     /// Умножает многочлены с учетом правил GF256
-    fn mul_poly(&self, a: &[u8], b: &[u8]) -> Vec<u8> {
+    fn mul_poly(&self, a: RefPoly, b: RefPoly) -> Poly {
         let mut result = vec![0u8; a.len() + b.len() - 1];
 
         for (i, &coef_a) in a.iter().enumerate() {
@@ -92,7 +94,7 @@ pub trait GF256 {
     }
 
     /// Функция для вычисления значения полинома в точке
-    fn eval_poly(&self, poly: &[u8], x: u8) -> u8 {
+    fn eval_poly(&self, poly: RefPoly, x: u8) -> u8 {
         let mut result = 0u8;
 
         for (i, &coef) in poly.iter().enumerate() {
@@ -104,12 +106,12 @@ pub trait GF256 {
     }
 
     /// Умножает коэффициенты многочлена на скаляр
-    fn scale_poly(&self, poly: &[u8], scalar: u8) -> Vec<u8> {
+    fn scale_poly(&self, poly: RefPoly, scalar: u8) -> Poly {
         poly.iter().map(|&coef| self.mul(coef, scalar)).collect()
     }
 
     /// Сдвигает многочлен на n
-    fn shift_poly(&self, poly: &[u8], shift: usize) -> Vec<u8> {
+    fn shift_poly(&self, poly: RefPoly, shift: usize) -> Poly {
         let mut result = vec![0u8; shift];
         result.extend_from_slice(poly);
         result
