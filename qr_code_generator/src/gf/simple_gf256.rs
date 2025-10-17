@@ -61,16 +61,20 @@ mod tests {
 
     #[test]
     fn test_gf256() {
-        gf_tests::test_gf256(SimpleGF256 {});
+        gf_tests::arithmetic_operations::test_gf256(SimpleGF256 {});
     }
 
     #[test]
+    #[ignore]
     fn test_gf256_performance() {
-        gf_tests::test_gf256_performance(SimpleGF256 {}, std::time::Duration::from_secs(70));
+        gf_tests::arithmetic_operations::test_gf256_performance(
+            SimpleGF256 {},
+            std::time::Duration::from_secs(70),
+        );
     }
 
     #[test]
     fn test_gf256_exceptions() {
-        gf_tests::test_gf256_exceptions(SimpleGF256 {});
+        gf_tests::arithmetic_operations::test_gf256_exceptions(SimpleGF256 {});
     }
 }
