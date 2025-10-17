@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 
-use crate::{Coder, Poly, RefPoly, gf::GF256};
+use crate::{
+    Coder, Poly, RefPoly,
+    gf::{GF256, GF256Poly},
+};
 
 /// k – число информационных символов, подлежащих кодированию,
 /// n – число кодовых символов в кодируемом блоке.
@@ -9,7 +12,7 @@ use crate::{Coder, Poly, RefPoly, gf::GF256};
 /// Минимальное расстояние определяется следующим образом: dmin = n–k+1.
 pub struct ReedSolomon<T>
 where
-    T: GF256,
+    T: GF256Poly,
 {
     control_count: usize,
     gf: T,
@@ -18,9 +21,18 @@ where
 
 impl<T> ReedSolomon<T>
 where
-    T: GF256,
+    T: GF256Poly,
 {
+    /// # Panics
+    /// Panics if `control_count` is greater than 255.
     pub fn new(control_count: usize, gf: T) -> Self {
+        if control_count > 255 {
+            panic!(
+                "The number of control characters cannot exceed 255, actual: {}",
+                control_count
+            );
+        }
+
         Self {
             control_count,
             gen_poly: Self::build_gen_poly(&gf, control_count),
@@ -56,13 +68,27 @@ where
 
 impl<T> Coder for ReedSolomon<T>
 where
-    T: GF256,
+    T: GF256Poly,
 {
     fn encode(&self, data: RefPoly) -> Result<Poly> {
         if data.len() + self.control_count > 255 {
             anyhow::bail!("Message too long and cannot be encoded with GF256");
         }
-        todo!()
+
+        // Полином сдвигается на n-k позиций для контрольных символов
+        let mut message = vec![0; self.control_count];
+        message.extend_from_slice(data);
+
+        for (i, &n) in self
+            .gf
+            .mod_poly(&message, &self.gen_poly) // Вычисляем остаток от деления
+            .iter()
+            .enumerate()
+        {
+            message[i] = n;
+        }
+
+        Ok(message)
     }
 
     fn decode(&self, data: RefPoly) -> Result<Poly> {
@@ -78,4 +104,5 @@ mod tests {
     use super::*;
 
     mod build_gen_poly;
+    mod encode;
 }
