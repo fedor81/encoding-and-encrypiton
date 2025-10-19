@@ -64,6 +64,35 @@ where
 
         gen_poly
     }
+
+    /// Вычисляет синдромы для многочлена `data`.
+    /// Коэффициенты синдрома ошибки получаются подстановкой степеней примитивного члена в остаток
+    /// многочлен `e(x) = C(x) mod g(x)`, или в сам многочлен сообщения `C(x)`.
+    ///
+    /// Нетрудно убедиться, что если бы сообщение не было искажено, то все коэффициенты Si оказались
+    /// бы равны нулю: ведь неискажённое сообщение `C(x)` кратно порождающему многочлену `g(x)`,
+    /// для которого числа `a1 , a2, ..., aN-K` являются корнями.
+    fn calculate_syndromes(&self, data: RefPoly) -> Poly {
+        let mut syndromes = vec![0u8; self.control_count];
+
+        for i in 0..self.control_count {
+            syndromes[i] = self.gf.eval_poly(data, self.gf.pow(2, i as u8))
+        }
+
+        syndromes
+    }
+
+    /// Локаторы ошибок – это элементы поля Галуа, степень которых совпадает с позицией
+    /// ошибки. Так, если искажён коэффициент при x4, то локатор этой ошибки равен a4, если
+    /// искажён коэффициент при x7 то локатор ошибки будет равен a7 и т.п. (а – примитивный член,
+    /// т.е. в нашем случае a=2).
+    ///
+    /// Многочлен локаторов L(x) – это многочлен, корни которого обратны локаторам ошибок.
+    /// Таким образом, многочлен L(x) должен иметь вид `L(x) = (1+xX1)(1+xX2)…(1+xXi)`,
+    /// где `X1, X2, Xi` – локаторы ошибок. (`1+xXi` обращается в ноль при `x=Xi-1 : XiXi-1 = 1, 1+1 =0`)
+    fn find_error_locator(&self, syndromes: RefPoly) -> Result<Poly> {
+        todo!()
+    }
 }
 
 impl<T> Coder for ReedSolomon<T>
@@ -91,18 +120,38 @@ where
         Ok(message)
     }
 
+    /// Декодирование основано на построении многочлена синдрома ошибки S(x) и отыскании
+    /// соответствующего ему многочлена локаторов L(x).
     fn decode(&self, data: RefPoly) -> Result<Poly> {
         if data.len() > 255 {
             anyhow::bail!("Message too long and cannot be decoded with GF256");
         }
+
+        // Если все синдромы равны нулю, то сообщение не повреждено
+        let syndromes = self.calculate_syndromes(data);
+
+        if syndromes.iter().all(|&s| s == 0) {
+            return Ok(data[self.control_count..].to_vec());
+        }
+
+        let error_locator = self.find_error_locator(&syndromes)?;
+
         todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::gf::FastGF256;
+
     use super::*;
 
     mod build_gen_poly;
     mod encode;
+    mod syndromes;
+
+    // Вспомогательная функция для создания кодера с заданным количеством контрольных символов
+    fn create_encoder(control_count: usize) -> ReedSolomon<FastGF256> {
+        ReedSolomon::new(control_count, FastGF256::new())
+    }
 }

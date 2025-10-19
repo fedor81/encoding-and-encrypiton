@@ -5,6 +5,46 @@ use crate::{Poly, RefPoly};
 
 pub fn test_poly_operations<T: GF256Poly>(gf: T) {
     test_div(&gf);
+    test_eval_poly(&gf);
+}
+
+pub fn test_eval_poly<T: GF256Poly>(gf: &T) {
+    println!("Testing polynomial evaluation...");
+
+    // Полином: 1
+    for n in 0..100 {
+        let actual = gf.eval_poly(&vec![1], n);
+        assert_eq!(1, actual, "eval_poly(1, {}) = {}", n, actual);
+    }
+
+    // Полином: x + 1
+    for n in 0..100 {
+        let actual = gf.eval_poly(&vec![1, 1], n);
+        assert_eq!(gf.add(n, 1), actual, "eval_poly(x + 1, {}) = {}", n, actual);
+    }
+
+    // Полином: x² + x + 1
+    for n in 0..100 {
+        let actual = gf.eval_poly(&vec![1, 1, 1], n);
+
+        let mut expected = gf.pow(n, 2);
+        expected = gf.add(expected, n);
+        expected = gf.add(expected, 1);
+
+        assert_eq!(
+            expected, actual,
+            "eval_poly(x² + x + 1, {}) = {}",
+            n, actual
+        );
+    }
+
+    // Полином: x³
+    for n in 0..100 {
+        let actual = gf.eval_poly(&vec![0, 0, 0, 1], n);
+        let expected = gf.pow(n, 3);
+
+        assert_eq!(expected, actual, "eval_poly(x³, {}) = {}", n, actual);
+    }
 }
 
 fn test_div<T: GF256Poly>(gf: &T) {
