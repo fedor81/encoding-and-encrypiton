@@ -1,11 +1,4 @@
-use crate::gf::FastGF256;
-
 use super::*;
-
-// Вспомогательная функция для создания кодера с заданным количеством контрольных символов
-fn create_encoder(control_count: usize) -> ReedSolomon<FastGF256> {
-    ReedSolomon::new(control_count, FastGF256::new())
-}
 
 #[test]
 fn test_encode_basic() {
