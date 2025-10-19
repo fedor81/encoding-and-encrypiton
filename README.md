@@ -97,4 +97,6 @@ cargo run --bin huffman_decoder
 
 Используемая литература:
 
+- [Детальный обзор полей Галуа](https://habr.com/ru/articles/916740/)
 - [Коды Рида-Соломона с точки зрения обывателя](https://asvk.cs.msu.ru/wp-content/uploads/2023/04/Kody-Rida-Solomona-1.pdf)
+- [Алгоритм Берлекэмпа — Мэсси](https://ru.wikipedia.org/wiki/%D0%90%D0%BB%D0%B3%D0%BE%D1%80%D0%B8%D1%82%D0%BC_%D0%91%D0%B5%D1%80%D0%BB%D0%B5%D0%BA%D1%8D%D0%BC%D0%BF%D0%B0_%E2%80%94_%D0%9C%D1%8D%D1%81%D1%81%D0%B8)
