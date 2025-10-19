@@ -90,8 +90,71 @@ where
     /// Многочлен локаторов L(x) – это многочлен, корни которого обратны локаторам ошибок.
     /// Таким образом, многочлен L(x) должен иметь вид `L(x) = (1+xX1)(1+xX2)…(1+xXi)`,
     /// где `X1, X2, Xi` – локаторы ошибок. (`1+xXi` обращается в ноль при `x=Xi-1 : XiXi-1 = 1, 1+1 =0`)
+    ///
+    /// # Алгоритм Берлекэмпа-Месси
+    ///
     fn find_error_locator(&self, syndromes: RefPoly) -> Result<Poly> {
-        todo!()
+        // C(x) - текущий полином локатора ошибок
+        let mut locator = vec![1u8]; // C(x) = 1
+        let mut old_locator = vec![1u8]; // B(x) — копия последнего C(x) на момент обновления L или предыдущий C(x)
+        let mut locator_degree = 0; // текущая степень C(x)
+        let mut m = 1; // номер итерации, прошедших с обновления L
+
+        for n in 0..self.control_count {
+            // Вычисляем расхождение d
+            let mut discrepancy = syndromes[n];
+
+            // d = Sn + C₁ * S{n-1} + C₂ * S{n-2} + ... + CL * S{n-L}
+            for i in 1..=locator_degree {
+                let product = self.gf.mul(locator[i], syndromes[n - i]);
+                discrepancy = self.gf.add(discrepancy, product);
+            }
+
+            // Если d равно нулю, это значит C(x) и L на данный момент верны, достаточно инкрементировать m и продолжить итерации.
+            if discrepancy == 0 {
+                m += 1;
+                continue;
+            }
+
+            // Если d ненулевое, алгоритм поправляет C(x) так, чтобы его обнулить d:
+            // C(x) = C(x) - (d/b)·B(x)·x^m, где B(x) – предыдущий C(x), b - копия последнего расхождения d
+
+            // Умножение на x^m — это, по сути, сдвиг коэффициентов B(x) на m
+
+            // Если 2L ≤ n: кардинально меняем локатор
+            if 2 * locator_degree <= n {
+                // Сохраняем текущий локатор
+                let temp = locator.clone();
+
+                // Вычисляем новый локатор
+                let scale = self.gf.div(discrepancy, old_locator[0]);
+                let scaled_old = self.gf.scale_poly(&old_locator, scale);
+                let shifted_scaled_old = self.gf.shift_poly(&scaled_old, m);
+
+                locator = self.gf.add_poly(&locator, &shifted_scaled_old);
+
+                // Обновляем степень и предыдущий локатор
+                locator_degree = n + 1 - locator_degree;
+                old_locator = temp;
+                m = 1;
+
+            // Если 2L > n: только корректируем текущий локатор
+            } else {
+                let scale = self.gf.div(discrepancy, old_locator[0]);
+                let scaled_old = self.gf.scale_poly(&old_locator, scale);
+                let shifted_scaled_old = self.gf.shift_poly(&scaled_old, m);
+
+                locator = self.gf.add_poly(&locator, &shifted_scaled_old);
+                m += 1;
+            }
+        }
+
+        // Проверяем, что можем исправить найденное количество ошибок
+        if locator_degree * 2 > self.control_count {
+            anyhow::bail!("Too many errors to correct");
+        }
+
+        Ok(locator)
     }
 }
 
@@ -120,8 +183,17 @@ where
         Ok(message)
     }
 
-    /// Декодирование основано на построении многочлена синдрома ошибки S(x) и отыскании
-    /// соответствующего ему многочлена локаторов L(x).
+    /// ## Шаги декодирования
+    /// 1. Вычислить e(x) = C(x) mod g(x).
+    /// 2. Если e(x) = 0 то выделить p(x) из C(x).
+    /// 3. Иначе, вычислить полином синдрома Si = e(ai+1)
+    /// 4. Построить матрицу M и вычислить L(x)
+    /// 5. Вычислить L’(x). L’i = Li+1 для чётных i и 0 для нечётных.
+    /// 6. Вычислить W(x) = S(x)*L(x)
+    /// 7. Получить корни L(x) – локаторы ошибок
+    /// 8. Получить значения ошибок Yi = W(Xi-1 )/L’(Xi-1 )
+    /// 9. Сформировать многочлен ошибок E(X) на основе локаторов и значений ошибок и
+    /// скорректировать C(x) = C(x) + E(x).
     fn decode(&self, data: RefPoly) -> Result<Poly> {
         if data.len() > 255 {
             anyhow::bail!("Message too long and cannot be decoded with GF256");
