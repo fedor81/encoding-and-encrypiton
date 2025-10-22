@@ -23,6 +23,26 @@ pub trait GF256 {
     fn _pow(&self, a: u8, n: u8) -> u8;
     fn _inverse(&self, a: u8) -> u8;
 
+    /// Примерный элемент поля.
+    fn alpha(&self) -> u8 {
+        2
+    }
+
+    /// Возвести в степень примитивный элемент.
+    fn alpha_pow(&self, n: u8) -> u8 {
+        self.pow(self.alpha(), n)
+    }
+
+    /// Увеличить число на 1.
+    fn inc(&self, a: u8) -> u8 {
+        self.add(a, 1)
+    }
+
+    /// Уменьшить число на 1.
+    fn dec(&self, a: u8) -> u8 {
+        self.sub(a, 1)
+    }
+
     /// Возвести число a в степень n.
     fn pow(&self, a: u8, n: u8) -> u8 {
         if n == 0 {

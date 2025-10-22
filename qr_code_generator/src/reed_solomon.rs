@@ -55,7 +55,7 @@ where
             let shifted_poly = gf.shift_poly(&gen_poly, 1);
 
             // Затем умножаем на α^i
-            let alpha_i = gf.pow(2, i as u8);
+            let alpha_i = gf.pow(gf.alpha(), i as u8);
             gen_poly = gf.mul_poly(&gen_poly, &vec![alpha_i]);
 
             // Складываем с результатом умножения
@@ -76,7 +76,7 @@ where
         let mut syndromes = vec![0u8; self.control_count];
 
         for i in 0..self.control_count {
-            syndromes[i] = self.gf.eval_poly(data, self.gf.pow(2, i as u8))
+            syndromes[i] = self.gf.eval_poly(data, self.gf.alpha_pow(i as u8))
         }
 
         syndromes
@@ -89,7 +89,7 @@ where
     ///
     /// Многочлен локаторов L(x) – это многочлен, корни которого обратны локаторам ошибок.
     /// Таким образом, многочлен L(x) должен иметь вид `L(x) = (1+xX1)(1+xX2)…(1+xXi)`,
-    /// где `X1, X2, Xi` – локаторы ошибок. (`1+xXi` обращается в ноль при `x=Xi-1 : XiXi-1 = 1, 1+1 =0`)
+    /// где `X1, X2, Xi` – локаторы ошибок. (`1+xXi` обращается в ноль при `x=Xi^(-1) : Xi * Xi^(-1) = 1, 1+1 =0`)
     ///
     /// # Алгоритм Берлекэмпа-Месси
     ///
@@ -156,6 +156,64 @@ where
 
         Ok(locator)
     }
+
+    /// Находит корни полинома локатора L(x) – они будут обратны к локаторам ошибок.
+    ///
+    /// `L(x) = (1+xX1)(1+xX2)…(1+xXi)`, где `X1, X2, Xi` – локаторы ошибок.
+    /// (`1+xXi` обращается в ноль при `x=Xi^(-1) : Xi * Xi^(-1) = 1, 1+1 =0`)
+    ///
+    /// Для поиска корней L(х) на множестве локаторов позиций кодовых символов используется метод
+    /// проб и ошибок, получивший название метод Ченя. Для всех ненулевых элементов a GF(2m),
+    /// которые генерируются в порядке `1, a, а2,... a14` проверяется условие `L(a^(-1))=0`.
+    fn find_error_positions(&self, error_locator: RefPoly, data_len: usize) -> Result<Vec<usize>> {
+        #[cfg(test)]
+        println!(
+            "find_error_positions for locator: {:?}, data_len: {}",
+            error_locator, data_len
+        );
+
+        let mut positions = Vec::new();
+        let expected_errors = error_locator.len() - 1;
+
+        for i in 0..data_len {
+            let x = self.gf.inverse(self.gf.alpha_pow(i as u8)); // α^(-i)
+            let value = self.gf.eval_poly(error_locator, x);
+
+            #[cfg(test)]
+            {
+                print!("  i={}, x=α^(-{})={}, eval result: {}", i, i, x, value);
+                if value == 0 {
+                    print!("\t<----");
+                }
+                println!();
+            }
+
+            if value == 0 {
+                positions.push(i);
+
+                // Ранний выход если нашли все ожидаемые ошибки
+                if positions.len() == expected_errors {
+                    break;
+                }
+            }
+        }
+
+        #[cfg(test)]
+        {
+            println!("Found positions: {:?}", positions);
+            println!("Expected errors: {}", expected_errors);
+        }
+
+        if positions.len() > expected_errors {
+            anyhow::bail!(
+                "Found more roots ({}) than expected errors ({})",
+                positions.len(),
+                expected_errors
+            );
+        }
+
+        Ok(positions)
+    }
 }
 
 impl<T> Coder for ReedSolomon<T>
@@ -183,14 +241,14 @@ where
         Ok(message)
     }
 
-    /// ## Шаги декодирования
+    /// # Шаги декодирования
     /// 1. Вычислить e(x) = C(x) mod g(x).
     /// 2. Если e(x) = 0 то выделить p(x) из C(x).
     /// 3. Иначе, вычислить полином синдрома Si = e(ai+1)
-    /// 4. Построить матрицу M и вычислить L(x)
-    /// 5. Вычислить L’(x). L’i = Li+1 для чётных i и 0 для нечётных.
-    /// 6. Вычислить W(x) = S(x)*L(x)
-    /// 7. Получить корни L(x) – локаторы ошибок
+    /// 4. Вычислить L(x) с помощью Берлекэмпа-Месси
+    /// 5. Получить корни L(x) – локаторы ошибок
+    /// 6. Вычислить L’(x). L’i = Li+1 для чётных i и 0 для нечётных.
+    /// 7. Вычислить W(x) = S(x)*L(x)
     /// 8. Получить значения ошибок Yi = W(Xi-1 )/L’(Xi-1 )
     /// 9. Сформировать многочлен ошибок E(X) на основе локаторов и значений ошибок и
     /// скорректировать C(x) = C(x) + E(x).
@@ -207,6 +265,7 @@ where
         }
 
         let error_locator = self.find_error_locator(&syndromes)?;
+        let error_positions = self.find_error_positions(&error_locator, data.len())?;
 
         todo!()
     }
@@ -220,6 +279,7 @@ mod tests {
 
     mod build_gen_poly;
     mod encode;
+    mod error_locator;
     mod syndromes;
 
     // Вспомогательная функция для создания кодера с заданным количеством контрольных символов
