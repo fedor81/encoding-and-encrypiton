@@ -13,8 +13,8 @@ pub use simple_gf256::SimpleGF256;
 /// Примитивный полином: x⁸ + x⁴ + x³ + x² + 1 = 0x11D или 285 в десятичной.
 pub const PRIMITIVE_POLY_FULL: u16 = 0x11D;
 
-/// Возьмем младшие степени примитивного полинома: x⁴ + x³ + x² + 1 = 0x1B или 27 в десятичной.
-pub const PRIMITIVE_POLY: u8 = 0x1B;
+/// Возьмем младшие степени примитивного полинома: x⁴ + x³ + x² + 1 = 0x1D или 29 в десятичной.
+pub const PRIMITIVE_POLY: u8 = 0x1D;
 
 /// Определяет арифметические операции над элементами поля GF(256).
 pub trait GF256 {
@@ -24,13 +24,13 @@ pub trait GF256 {
     fn _inverse(&self, a: u8) -> u8;
 
     /// Примерный элемент поля.
-    fn alpha(&self) -> u8 {
+    fn alpha() -> u8 {
         2
     }
 
     /// Возвести в степень примитивный элемент.
     fn alpha_pow(&self, n: u8) -> u8 {
-        self.pow(self.alpha(), n)
+        self.pow(Self::alpha(), n)
     }
 
     /// Увеличить число на 1.

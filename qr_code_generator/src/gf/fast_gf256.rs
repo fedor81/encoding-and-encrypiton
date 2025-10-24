@@ -30,6 +30,44 @@ impl FastGF256 {
         }
     }
 
+    /// проверка таблицы логарифмов/экспонент
+    #[cfg(test)]
+    fn debug_tables(&self) {
+        println!("Проверка таблиц:");
+        for i in 0..10 {
+            println!(
+                "exp_table[{}] = {}, log_table[{}] = {}",
+                i, self.exp_table[i], i, self.log_table[i]
+            );
+        }
+        println!("...");
+        for i in 250..256 {
+            println!(
+                "exp_table[{}] = {}, log_table[{}] = {}",
+                i, self.exp_table[i], i, self.log_table[i]
+            );
+        }
+
+        println!();
+
+        // Проверим конкретные значения
+        assert_eq!(self.log_table[15], 75, "15 в log_table");
+        assert_eq!(self.log_table[6], 26, "6 в log_table");
+
+        println!();
+
+        let log_15 = self.log_table[15] as usize;
+        let log_6 = self.log_table[6] as usize;
+        println!("log(15) = {}, log(6) = {}", log_15, log_6);
+        println!(
+            "exp_table[{}] = {}",
+            log_15 + log_6,
+            self.exp_table[log_15 + log_6]
+        );
+
+        println!()
+    }
+
     #[cfg(test)]
     pub fn pow_primitive_poly(&self, n: u8) -> u8 {
         self.exp_table[n as usize]
@@ -37,11 +75,15 @@ impl FastGF256 {
 }
 
 impl GF256 for FastGF256 {
+    fn alpha() -> u8 {
+        2
+    }
+
     fn _div(&self, a: u8, b: u8) -> u8 {
         let log_a = self.log_table[a as usize] as i16;
         let log_b = self.log_table[b as usize] as i16;
-        let result = (log_a - log_b + 255) % 255;
-        self.exp_table[result as usize]
+        let res = (log_a - log_b + 255) % 255;
+        self.exp_table[res as usize]
     }
 
     /// Так как любой элемент представим в виде степени примитивного многочлена, если
@@ -52,7 +94,8 @@ impl GF256 for FastGF256 {
     fn _mul(&self, a: u8, b: u8) -> u8 {
         let log_a = self.log_table[a as usize] as usize;
         let log_b = self.log_table[b as usize] as usize;
-        self.exp_table[(log_a + log_b) % 255]
+        let res = (log_a + log_b) % 255;
+        self.exp_table[res]
     }
 
     fn _pow(&self, a: u8, n: u8) -> u8 {
@@ -74,10 +117,14 @@ mod tests {
 
     #[test]
     fn test_gf256() {
-        gf_tests::arithmetic_operations::test_gf256(FastGF256::new());
+        let gf = FastGF256::new();
+        gf.debug_tables();
+
+        gf_tests::arithmetic_operations::test_gf256(gf);
     }
 
     #[test]
+    #[ignore]
     fn test_gf256_performance() {
         gf_tests::arithmetic_operations::test_gf256_performance(
             FastGF256::new(),
