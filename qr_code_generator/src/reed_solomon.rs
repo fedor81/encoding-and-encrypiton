@@ -1,5 +1,3 @@
-use std::ops::SubAssign;
-
 use anyhow::{Context, Result, anyhow};
 
 use crate::{
@@ -57,7 +55,7 @@ where
             let shifted_poly = gf.shift_poly(&gen_poly, 1);
 
             // Затем умножаем на α^i
-            let alpha_i = gf.pow(gf.alpha(), i as u8);
+            let alpha_i = gf.pow(T::alpha(), i as u8);
             gen_poly = gf.mul_poly(&gen_poly, &vec![alpha_i]);
 
             // Складываем с результатом умножения
@@ -153,7 +151,12 @@ where
 
         // Проверяем, что можем исправить найденное количество ошибок
         if locator_degree * 2 > self.control_count {
-            anyhow::bail!("Too many errors to correct");
+            anyhow::bail!(
+                "Failed to find error locator: too many errors to correct \
+                (locator degree: {locator_degree}, control count: {}). \n\
+                Syndromes: {syndromes:?}",
+                self.control_count,
+            );
         }
 
         Ok(locator)
@@ -168,27 +171,12 @@ where
     /// проб и ошибок, получивший название метод Ченя. Для всех ненулевых элементов a GF(2m),
     /// которые генерируются в порядке `1, a, а2,... a14` проверяется условие `L(a^(-1))=0`.
     fn find_error_positions(&self, error_locator: RefPoly, data_len: usize) -> Result<Vec<usize>> {
-        #[cfg(test)]
-        println!(
-            "find_error_positions for locator: {:?}, data_len: {}",
-            error_locator, data_len
-        );
-
         let mut positions = Vec::new();
         let expected_errors = error_locator.len() - 1;
 
         for i in 0..data_len {
             let x = self.gf.inverse(self.gf.alpha_pow(i as u8)); // α^(-i)
             let value = self.gf.eval_poly(error_locator, x);
-
-            #[cfg(test)]
-            {
-                print!("  i={}, x=α^(-{})={}, eval result: {}", i, i, x, value);
-                if value == 0 {
-                    print!("\t<----");
-                }
-                println!();
-            }
 
             if value == 0 {
                 positions.push(i);
@@ -200,25 +188,22 @@ where
             }
         }
 
-        #[cfg(test)]
-        {
-            println!("Found positions: {:?}", positions);
-            println!("Expected errors: {}", expected_errors);
-        }
-
         if positions.len() > expected_errors {
             anyhow::bail!(
-                "Found more roots ({}) than expected errors ({})",
+                "Found more roots ({}) than expected errors ({}). \n\
+                Locator: {:?}, \n\
+                Data length: {}, Found positions: {:?}",
                 positions.len(),
-                expected_errors
+                expected_errors,
+                error_locator,
+                data_len,
+                positions
             );
         }
 
         Ok(positions)
     }
 
-    /// TODO: Сделать, чтобы функция сразу возвращала исправляющий полином
-    ///
     /// Далее вычисляется `W(x) = L(x)*S(x)`, коэффициенты старшие чем N-k должны быть обнулены.
     ///
     /// Далее вычисляются значения ошибок по формуле `Yi = W( Xi^(-1) )/L'( Xi^(-1) )`.
@@ -227,16 +212,29 @@ where
     fn find_error_magnitudes(
         &self,
         syndromes: RefPoly,
-        error_locator: RefPoly,
+        locator: RefPoly,
         error_positions: &[usize],
+        data_len: usize,
     ) -> Vec<u8> {
-        let mut syndrome_poly = syndromes.to_vec();
-        syndrome_poly.insert(0, 1);
+        // W(x) = L(x)*S(x)
+        let omega = &self.gf.mul_poly(locator, syndromes)[..data_len - self.control_count];
 
         // Вычисляем производную локатора ошибок
-        let locator_derivative = self.find_locator_derivative(&error_locator);
+        let locator_derivative = self.find_locator_derivative(&locator);
 
-        todo!()
+        let mut magnitudes = Vec::new();
+
+        for &err_pos in error_positions.iter() {
+            let x_inv = self.gf.inverse(self.gf.alpha_pow(err_pos as u8));
+
+            let numerator = self.gf.eval_poly(omega, x_inv);
+            let denominator = self.gf.eval_poly(&locator_derivative, x_inv);
+
+            let magnitude = self.gf.div(numerator, denominator);
+            magnitudes.push(magnitude);
+        }
+
+        magnitudes
     }
 
     /// Вычисляет производную L'(x) следующим образом – для чётных степеней производная равна нулю,
@@ -262,6 +260,38 @@ where
         }
 
         locator_derivative
+    }
+
+    /// Исправляет ошибки в сообщении. Ошибка на позиции err_pos[i] с magnitude[i] вычитается из сообщения.
+    ///
+    /// # Panics
+    /// Паникует, если err_pos[i] >= message.len()
+    fn correct_errors(
+        &self,
+        data: RefPoly,
+        error_positions: &[usize],
+        error_magnitudes: &[u8],
+    ) -> Poly {
+        let mut corrected = data.to_vec();
+
+        for (&pos, &magnitude) in error_positions.iter().zip(error_magnitudes.iter()) {
+            if pos < corrected.len() {
+                corrected[pos] = self.gf.sub(corrected[pos], magnitude);
+            } else {
+                panic!(
+                    "Error position out of bounds (pos: {}, len: {}) \n\
+                    message: {:?} \n\
+                    positions: {:?} \n\
+                    magnitudes: {:?}",
+                    pos,
+                    corrected.len(),
+                    data,
+                    error_positions,
+                    error_magnitudes
+                );
+            }
+        }
+        corrected
     }
 }
 
@@ -316,23 +346,24 @@ where
         let error_locator = self.find_error_locator(&syndromes)?;
         let error_positions = self.find_error_positions(&error_locator, data.len())?;
         let error_magnitudes =
-            self.find_error_magnitudes(&syndromes, &error_locator, &error_positions);
+            self.find_error_magnitudes(&syndromes, &error_locator, &error_positions, data.len());
 
         // Исправляем ошибки
-        let mut corrected = data.to_vec();
-
-        for (&i, &magnitude) in error_positions.iter().zip(error_magnitudes.iter()) {
-            if i < corrected.len() {
-                corrected[i] = self.gf.sub(corrected[i], magnitude);
-            } else {
-                anyhow::bail!("Error position out of bounds")
-            }
-        }
+        let corrected = self.correct_errors(data, &error_positions, &error_magnitudes);
 
         // Проверяем синдромы после исправления
         let syndromes_after = self.calculate_syndromes(&corrected);
         if syndromes_after.iter().any(|&s| s != 0) {
-            anyhow::bail!("Could not correct all errors")
+            anyhow::bail!(
+                "Could not correct all errors. \n\
+                Original data:\t {data:?}, \n\
+                Corrected data:\t {corrected:?}, \n\
+                Error locator: {error_locator:?}, \n\
+                Error positions: {error_positions:?}, \n\
+                Error magnitudes: {error_magnitudes:?}, \n\
+                Syndromes before:\t {syndromes:?}, \n\
+                Syndromes after:\t {syndromes_after:?}",
+            );
         }
 
         Ok(corrected[self.control_count..].to_vec())
@@ -346,8 +377,9 @@ mod tests {
     use super::*;
 
     mod build_gen_poly;
+    mod decode;
     mod encode;
-    mod error_locator;
+    mod locator;
     mod syndromes;
 
     // Вспомогательная функция для создания кодера с заданным количеством контрольных символов

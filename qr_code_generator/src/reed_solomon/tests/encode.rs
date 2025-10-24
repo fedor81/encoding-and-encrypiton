@@ -13,6 +13,8 @@ fn test_encode_basic() {
     assert_eq!(&encoded[4..], data.as_slice());
     // Проверяем, что контрольные символы не нулевые
     assert!(encoded[0] != 0 || encoded[1] != 0 || encoded[2] != 0 || encoded[3] != 0);
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -24,6 +26,8 @@ fn test_encode_single_byte() {
 
     assert_eq!(encoded.len(), 6);
     assert_eq!(encoded[5], 42);
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -39,6 +43,8 @@ fn test_encode_max_length() {
 
     assert_eq!(encoded.len(), 255);
     assert_eq!(&encoded[control_count..], data.as_slice());
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -62,6 +68,8 @@ fn test_encode_different_control_counts() {
 
         assert_eq!(encoded.len(), data.len() + control_count);
         assert_eq!(&encoded[*control_count..], data.as_slice());
+
+        check_syndromes(&encoder, &encoded);
     }
 }
 
@@ -79,6 +87,8 @@ fn test_encode_zeros() {
     assert_eq!(encoded[1], 0);
     assert_eq!(encoded[2], 0);
     assert_eq!(encoded[3], 0);
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -92,6 +102,8 @@ fn test_encode_ones() {
     assert_eq!(&encoded[3..], data.as_slice());
     // Контрольные символы не должны быть всеми единицами
     assert!(encoded[0] != 1 || encoded[1] != 1 || encoded[2] != 1);
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -103,6 +115,8 @@ fn test_encode_high_values() {
 
     assert_eq!(encoded.len(), 8);
     assert_eq!(&encoded[4..], data.as_slice());
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -150,6 +164,8 @@ fn test_encode_boundary_values() {
         let encoded = encoder.encode(&data).unwrap();
         assert_eq!(encoded.len(), data.len() + 4);
         assert_eq!(&encoded[4..], data.as_slice());
+
+        check_syndromes(&encoder, &encoded);
     }
 }
 
@@ -163,6 +179,8 @@ fn test_encode_preserves_data_integrity() {
     // Проверяем, что исходные данные не были изменены
     let recovered_data = &encoded[8..];
     assert_eq!(recovered_data, original_data.as_slice());
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -176,6 +194,8 @@ fn test_encode_control_symbols_non_trivial() {
     // Проверяем, что хотя бы один контрольный символ ненулевой
     // (для нетривиальных данных)
     assert!(control_symbols.iter().any(|&x| x != 0));
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -187,6 +207,8 @@ fn test_encode_large_control_count() {
 
     assert_eq!(encoded.len(), 82);
     assert_eq!(&encoded[32..], data.as_slice());
+
+    check_syndromes(&encoder, &encoded);
 }
 
 // Property-based тесты
@@ -201,6 +223,10 @@ fn test_encode_length_invariant() {
 
         // Инвариант: длина закодированных данных = длина исходных данных + контрольные символы
         assert_eq!(encoded.len(), data.len() + 10);
+
+        // Проверка, что синдромы равны нулю
+
+        check_syndromes(&encoder, &encoded);
     }
 }
 
@@ -215,6 +241,8 @@ fn test_encode_data_preservation_invariant() {
 
         // Инвариант: исходные данные сохраняются в конце закодированного сообщения
         assert_eq!(&encoded[7..], data.as_slice());
+
+        check_syndromes(&encoder, &encoded);
     }
 }
 
@@ -224,13 +252,15 @@ fn test_encode_stress() {
     let encoder = create_encoder(16);
 
     // Многократное кодирование разных данных
-    for i in 0..100 {
+    for i in 0..1000 {
         let data: Vec<u8> = (0..(i % 50 + 1)).map(|j| (i * j) as u8).collect();
 
         let encoded = encoder.encode(&data).unwrap();
 
         assert_eq!(encoded.len(), data.len() + 16);
         assert_eq!(&encoded[16..], data.as_slice());
+
+        check_syndromes(&encoder, &encoded);
     }
 }
 
@@ -258,6 +288,8 @@ fn test_encode_minimal_control() {
 
     assert_eq!(encoded.len(), 2);
     assert_eq!(encoded[1], 42);
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -269,6 +301,8 @@ fn test_encode_large_control_small_data() {
 
     assert_eq!(encoded.len(), 53);
     assert_eq!(&encoded[50..], data.as_slice());
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -280,6 +314,8 @@ fn test_encode_sequential_data() {
 
     assert_eq!(encoded.len(), 25);
     assert_eq!(&encoded[5..], data.as_slice());
+
+    check_syndromes(&encoder, &encoded);
 }
 
 #[test]
@@ -292,4 +328,16 @@ fn test_encode_random_like_data() {
 
     assert_eq!(encoded.len(), 18);
     assert_eq!(&encoded[8..], data.as_slice());
+
+    check_syndromes(&encoder, &encoded);
+}
+
+/// Проверка, что синдромы равны нулю
+fn check_syndromes(encoder: &ReedSolomon<FastGF256>, encoded: RefPoly) {
+    let syndromes = encoder.calculate_syndromes(&encoded);
+
+    assert!(
+        syndromes.iter().all(|&s| s == 0),
+        "Syndromes: {syndromes:?} should be all zero for \n Encoded: {encoded:?}",
+    );
 }

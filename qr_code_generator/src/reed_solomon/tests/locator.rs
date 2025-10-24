@@ -33,11 +33,13 @@ fn test_find_locator_derivative() {
         let mut input = vec![0; i + 1];
         input[i] = n;
 
-        let mut expected;
+        let mut expected = vec![0; i];
+
         if i % 2 == 1 {
-            expected = vec![0; i];
             expected[i - 1] = n;
-        } else {
+        }
+
+        if expected.iter().all(|&n| n == 0) {
             expected = vec![0];
         }
 
@@ -54,3 +56,27 @@ fn test_find_locator_derivative() {
         vec![6, 0, 4],                                 // L'(x) = 6 + 4x^2
     );
 }
+
+// #[test]
+// fn test_find_error_magnitudes() {
+//     let en = create_encoder(6);
+
+//     let syndromes = &vec![0, 15, 15, 2, 3, 9]; // S(x) = 15x + 15x^2 + 2x^3 + 3x^4 + 9x^5
+//     let locator = &vec![1, 6, 5, 4]; // L(x) = 1 + 6x + 5x^2 + 4x^3
+
+//     Ошибка в тестовых данных
+//     assert_eq!(
+//         en.gf.mul_poly(syndromes, locator),
+//         vec![0, 15, 11, 19, 0, 53, 49, 33, 36] // 15x + 11x^2 + 19x^3 + 53x^5 + 49x^6 + 33x^7 + 36x^8
+//     );
+
+//     assert_eq!(
+//         en.find_error_magnitudes(
+//             syndromes,
+//             locator,
+//             &vec![11, 3, 4], // Позиции ошибок
+//             15               // Длина полученного сообщения
+//         ),
+//         vec![7, 3, 2] // Значения ошибок
+//     );
+// }
