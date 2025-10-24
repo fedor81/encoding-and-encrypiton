@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use std::ops::SubAssign;
+
+use anyhow::{Context, Result, anyhow};
 
 use crate::{
     Coder, Poly, RefPoly,
@@ -214,6 +216,53 @@ where
 
         Ok(positions)
     }
+
+    /// TODO: Сделать, чтобы функция сразу возвращала исправляющий полином
+    ///
+    /// Далее вычисляется `W(x) = L(x)*S(x)`, коэффициенты старшие чем N-k должны быть обнулены.
+    ///
+    /// Далее вычисляются значения ошибок по формуле `Yi = W( Xi^(-1) )/L'( Xi^(-1) )`.
+    /// Таким образом, составляется полином ошибки. Его коэффициентами являются значения ошибок Yi
+    /// стоящие в позициях, определяемых локаторами ошибок.
+    fn find_error_magnitudes(
+        &self,
+        syndromes: RefPoly,
+        error_locator: RefPoly,
+        error_positions: &[usize],
+    ) -> Vec<u8> {
+        let mut syndrome_poly = syndromes.to_vec();
+        syndrome_poly.insert(0, 1);
+
+        // Вычисляем производную локатора ошибок
+        let locator_derivative = self.find_locator_derivative(&error_locator);
+
+        todo!()
+    }
+
+    /// Вычисляет производную L'(x) следующим образом – для чётных степеней производная равна нулю,
+    /// для нечётных - степени уменьшенной на 1: `(x^2)' = 0, (x^3)' = x^2`
+    fn find_locator_derivative(&self, locator: RefPoly) -> Poly {
+        let mut locator_derivative = vec![0; locator.len()];
+
+        // Производная для x^0 = 0, поэтому начинаем с 1
+        for i in 1..locator.len() {
+            // Нечетная степень
+            if i % 2 == 1 {
+                locator_derivative[i - 1] = locator[i];
+            }
+        }
+
+        // Убираем нулевые коэффициенты
+        for i in (1..locator_derivative.len()).rev() {
+            if locator_derivative[i] == 0 {
+                locator_derivative.pop();
+            } else {
+                break;
+            }
+        }
+
+        locator_derivative
+    }
 }
 
 impl<T> Coder for ReedSolomon<T>
@@ -266,8 +315,27 @@ where
 
         let error_locator = self.find_error_locator(&syndromes)?;
         let error_positions = self.find_error_positions(&error_locator, data.len())?;
+        let error_magnitudes =
+            self.find_error_magnitudes(&syndromes, &error_locator, &error_positions);
 
-        todo!()
+        // Исправляем ошибки
+        let mut corrected = data.to_vec();
+
+        for (&i, &magnitude) in error_positions.iter().zip(error_magnitudes.iter()) {
+            if i < corrected.len() {
+                corrected[i] = self.gf.sub(corrected[i], magnitude);
+            } else {
+                anyhow::bail!("Error position out of bounds")
+            }
+        }
+
+        // Проверяем синдромы после исправления
+        let syndromes_after = self.calculate_syndromes(&corrected);
+        if syndromes_after.iter().any(|&s| s != 0) {
+            anyhow::bail!("Could not correct all errors")
+        }
+
+        Ok(corrected[self.control_count..].to_vec())
     }
 }
 
