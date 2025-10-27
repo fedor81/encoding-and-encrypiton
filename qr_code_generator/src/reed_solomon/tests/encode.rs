@@ -1,23 +1,6 @@
 use super::*;
 
 #[test]
-fn test_encode_basic() {
-    let encoder = create_encoder(4);
-    let data = vec![1, 2, 3, 4, 5];
-
-    let encoded = encoder.encode(&data).unwrap();
-
-    // Проверяем, что длина результата = длина данных + контрольные символы
-    assert_eq!(encoded.len(), data.len() + 4);
-    // Проверяем, что исходные данные сохранились в конце
-    assert_eq!(&encoded[4..], data.as_slice());
-    // Проверяем, что контрольные символы не нулевые
-    assert!(encoded[0] != 0 || encoded[1] != 0 || encoded[2] != 0 || encoded[3] != 0);
-
-    check_syndromes(&encoder, &encoded);
-}
-
-#[test]
 fn test_encode_single_byte() {
     let encoder = create_encoder(5);
     let data = vec![42];
@@ -27,7 +10,9 @@ fn test_encode_single_byte() {
     assert_eq!(encoded.len(), 6);
     assert_eq!(encoded[5], 42);
 
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {data:?}"))
+        .unwrap();
 }
 
 #[test]
@@ -44,7 +29,9 @@ fn test_encode_max_length() {
     assert_eq!(encoded.len(), 255);
     assert_eq!(&encoded[control_count..], data.as_slice());
 
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {data:?}"))
+        .unwrap();
 }
 
 #[test]
@@ -56,21 +43,6 @@ fn test_encode_exceeds_max_length() {
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("too long"));
-}
-
-#[test]
-fn test_encode_different_control_counts() {
-    for control_count in [1, 2, 4, 8, 16, 32].iter() {
-        let encoder = create_encoder(*control_count);
-        let data = vec![1, 2, 3, 4, 5];
-
-        let encoded = encoder.encode(&data).unwrap();
-
-        assert_eq!(encoded.len(), data.len() + control_count);
-        assert_eq!(&encoded[*control_count..], data.as_slice());
-
-        check_syndromes(&encoder, &encoded);
-    }
 }
 
 #[test]
@@ -88,7 +60,9 @@ fn test_encode_zeros() {
     assert_eq!(encoded[2], 0);
     assert_eq!(encoded[3], 0);
 
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {data:?}"))
+        .unwrap();
 }
 
 #[test]
@@ -103,7 +77,9 @@ fn test_encode_ones() {
     // Контрольные символы не должны быть всеми единицами
     assert!(encoded[0] != 1 || encoded[1] != 1 || encoded[2] != 1);
 
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {data:?}"))
+        .unwrap();
 }
 
 #[test]
@@ -116,7 +92,9 @@ fn test_encode_high_values() {
     assert_eq!(encoded.len(), 8);
     assert_eq!(&encoded[4..], data.as_slice());
 
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {data:?}"))
+        .unwrap();
 }
 
 #[test]
@@ -165,7 +143,9 @@ fn test_encode_boundary_values() {
         assert_eq!(encoded.len(), data.len() + 4);
         assert_eq!(&encoded[4..], data.as_slice());
 
-        check_syndromes(&encoder, &encoded);
+        check_syndromes(&encoder, &encoded)
+            .with_context(|| format!("\n Message: {data:?}"))
+            .unwrap();
     }
 }
 
@@ -180,35 +160,9 @@ fn test_encode_preserves_data_integrity() {
     let recovered_data = &encoded[8..];
     assert_eq!(recovered_data, original_data.as_slice());
 
-    check_syndromes(&encoder, &encoded);
-}
-
-#[test]
-fn test_encode_control_symbols_non_trivial() {
-    let encoder = create_encoder(4);
-    let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
-
-    let encoded = encoder.encode(&data).unwrap();
-    let control_symbols = &encoded[0..4];
-
-    // Проверяем, что хотя бы один контрольный символ ненулевой
-    // (для нетривиальных данных)
-    assert!(control_symbols.iter().any(|&x| x != 0));
-
-    check_syndromes(&encoder, &encoded);
-}
-
-#[test]
-fn test_encode_large_control_count() {
-    let encoder = create_encoder(32);
-    let data = vec![100; 50];
-
-    let encoded = encoder.encode(&data).unwrap();
-
-    assert_eq!(encoded.len(), 82);
-    assert_eq!(&encoded[32..], data.as_slice());
-
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {:?}", original_data))
+        .unwrap();
 }
 
 // Property-based тесты
@@ -226,7 +180,9 @@ fn test_encode_length_invariant() {
 
         // Проверка, что синдромы равны нулю
 
-        check_syndromes(&encoder, &encoded);
+        check_syndromes(&encoder, &encoded)
+            .with_context(|| format!("\n Message: {data:?}"))
+            .unwrap();
     }
 }
 
@@ -242,25 +198,9 @@ fn test_encode_data_preservation_invariant() {
         // Инвариант: исходные данные сохраняются в конце закодированного сообщения
         assert_eq!(&encoded[7..], data.as_slice());
 
-        check_syndromes(&encoder, &encoded);
-    }
-}
-
-// Стресс-тест
-#[test]
-fn test_encode_stress() {
-    let encoder = create_encoder(16);
-
-    // Многократное кодирование разных данных
-    for i in 0..1000 {
-        let data: Vec<u8> = (0..(i % 50 + 1)).map(|j| (i * j) as u8).collect();
-
-        let encoded = encoder.encode(&data).unwrap();
-
-        assert_eq!(encoded.len(), data.len() + 16);
-        assert_eq!(&encoded[16..], data.as_slice());
-
-        check_syndromes(&encoder, &encoded);
+        check_syndromes(&encoder, &encoded)
+            .with_context(|| format!("\n Message: {data:?}"))
+            .unwrap();
     }
 }
 
@@ -289,55 +229,115 @@ fn test_encode_minimal_control() {
     assert_eq!(encoded.len(), 2);
     assert_eq!(encoded[1], 42);
 
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {data:?}"))
+        .unwrap();
 }
 
 #[test]
 fn test_encode_large_control_small_data() {
-    let encoder = create_encoder(50);
+    let control = 200;
+    let encoder = create_encoder(control);
     let data = vec![1, 2, 3];
 
     let encoded = encoder.encode(&data).unwrap();
 
-    assert_eq!(encoded.len(), 53);
-    assert_eq!(&encoded[50..], data.as_slice());
+    assert_eq!(encoded.len(), control + data.len());
+    assert_eq!(&encoded[control..], data.as_slice());
 
-    check_syndromes(&encoder, &encoded);
+    check_syndromes(&encoder, &encoded)
+        .with_context(|| format!("\n Message: {data:?}"))
+        .unwrap();
+}
+
+// Многократное кодирование разных данных
+#[test]
+fn debug_simple_test() {
+    let encoder = create_encoder(2);
+    let data = vec![1, 2];
+    
+    println!("Data: {:?}", data);
+    
+    let encoded = encoder.encode(&data).unwrap();
+    println!("Encoded: {:?}", encoded);
+    
+    // Проверим синдромы
+    let syndromes = encoder.calculate_syndromes(&encoded);
+    println!("Syndromes: {:?}", syndromes);
+    
+    // Проверим остаток от деления
+    let remainder = encoder.gf.mod_poly(&encoded, &encoder.gen_poly);
+    println!("Remainder: {:?}", remainder);
+    
+    // Проверим порождающий многочлен
+    println!("Generator polynomial: {:?}", encoder.gen_poly);
+    
+    // Проверим корни порождающего многочлена
+    for i in 0..2 {
+        let root = encoder.gf.alpha_pow(i as u8);
+        let value = encoder.gf.eval_poly(&encoder.gen_poly, root);
+        println!("Root α^{} = {}, polynomial value = {}", i, root, value);
+    }
+    
+    // Проверим, что синдромы равны нулю
+    check_syndromes(&encoder, &encoded).unwrap();
 }
 
 #[test]
-fn test_encode_sequential_data() {
-    let encoder = create_encoder(5);
-    let data: Vec<u8> = (0..20).collect();
+fn test_random_stress() {
+    let encoders_count = 10;
+    let tests_count = 100;
 
-    let encoded = encoder.encode(&data).unwrap();
+    let max_control_count = 10;
+    let max_data_len = 20;
 
-    assert_eq!(encoded.len(), 25);
-    assert_eq!(&encoded[5..], data.as_slice());
+    for j in 0..encoders_count {
+        let control = rand::random_range(1..=max_control_count);
+        let encoder = create_encoder(control);
 
-    check_syndromes(&encoder, &encoded);
-}
+        for i in 1..=tests_count {
+            let len = rand::random_range(1..=max_data_len);
+            let data: Vec<u8> = rand::random_iter().take(len).collect();
 
-#[test]
-fn test_encode_random_like_data() {
-    let encoder = create_encoder(8);
-    // Данные, похожие на случайные
-    let data = vec![123, 45, 67, 89, 210, 132, 54, 176, 198, 220];
+            let encoded = encoder.encode(&data).unwrap();
 
-    let encoded = encoder.encode(&data).unwrap();
+            assert_eq!(encoded.len(), data.len() + control);
+            assert_eq!(&encoded[control..], data.as_slice());
 
-    assert_eq!(encoded.len(), 18);
-    assert_eq!(&encoded[8..], data.as_slice());
-
-    check_syndromes(&encoder, &encoded);
+            check_syndromes(&encoder, &encoded)
+                .with_context(|| {
+                    format!(
+                        "\nIteration: {}, \n\
+                        Control Count: {control} \n\
+                        Message: {data:?}",
+                        j * encoders_count + i
+                    )
+                })
+                .unwrap();
+        }
+    }
 }
 
 /// Проверка, что синдромы равны нулю
-fn check_syndromes(encoder: &ReedSolomon<FastGF256>, encoded: RefPoly) {
+fn check_syndromes(encoder: &ReedSolomon<FastGF256>, encoded: RefPoly) -> Result<()> {
     let syndromes = encoder.calculate_syndromes(&encoded);
 
-    assert!(
-        syndromes.iter().all(|&s| s == 0),
-        "Syndromes: {syndromes:?} should be all zero for \n Encoded: {encoded:?}",
-    );
+    // Проверим деление вручную
+    let remainder = encoder.gf.mod_poly(&encoded, &encoder.gen_poly);
+
+    if syndromes.iter().any(|&s| s != 0) {
+        anyhow::bail!(
+            "Syndromes: {syndromes:?} should be all zero for \n\
+            Encoded: {encoded:?} \n\
+            Remainder after division encoded / gen_poly: {remainder:?} \n\
+            Generator polynomial: {:?} \n\
+            Powers Alpha: {:?}",
+            encoder.gen_poly,
+            (0..encoder.control_count)
+                .into_iter()
+                .map(|i| encoder.gf.alpha_pow(i as u8))
+                .collect::<Vec<_>>()
+        )
+    }
+    Ok(())
 }

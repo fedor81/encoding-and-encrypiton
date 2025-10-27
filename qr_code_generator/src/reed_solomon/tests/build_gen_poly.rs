@@ -35,7 +35,7 @@ fn test_generator_poly_properties(gf: &FastGF256, gen_poly: RefPoly, control: us
 
     // 3. Проверяем, что полином имеет корни α^0, α^1, ..., α^(nsym-1)
     for i in 0..control {
-        let root = gf.pow_primitive_poly(i as u8);
+        let root = gf.alpha_pow(i as u8);
         let value = gf.eval_poly(gen_poly, root);
         assert_eq!(
             value, 0,
@@ -51,12 +51,7 @@ fn test_generator_poly_properties(gf: &FastGF256, gen_poly: RefPoly, control: us
         "Generator polynomial should be monic"
     );
 
-    // 5. Проверяем, что все коэффициенты находятся в поле GF(256)
-    for &coef in gen_poly {
-        assert!(coef <= 255, "Coefficient out of GF(256) range: {}", coef);
-    }
-
-    // 6. Проверяем, что полином не имеет корней кроме α^0..α^(nsym-1)
+    // 5. Проверяем, что полином не имеет корней кроме α^0..α^(nsym-1)
     // (это сложно проверить полностью, но проверим несколько случайных точек)
     for _ in 0..5 {
         let random_point = gf.pow_primitive_poly(100 + control as u8); // Берем точку вне диапазона корней
@@ -161,7 +156,11 @@ fn test_build_gen_poly_edge_cases() {
         2,
         "Generator polynomial for nsym=1 should have length 2"
     );
-    assert_eq!(gen_poly_1[0], 1, "Leading coefficient should be 1");
+    assert_eq!(gen_poly_1[gen_poly_1.len() - 1], 1, "Leading coefficient should be 1");
+    
+    // Проверяем корень α^0
+    let root = gf.pow_primitive_poly(0);
+    assert_eq!(gf.eval_poly(&gen_poly_1, root), 0, "Root α^0 should be zero");
 
     // nsym = максимальное разумное значение
     let gen_poly_large = ReedSolomon::build_gen_poly(&gf, 32);
@@ -280,6 +279,6 @@ fn test_against_known_vectors() {
 
         // Также проверяем базовые свойства
         assert_eq!(actual.len(), nsym + 1);
-        assert_eq!(actual[0], 1);
+        assert_eq!(actual[actual.len() - 1], 1);
     }
 }
