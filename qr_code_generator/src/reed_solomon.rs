@@ -42,9 +42,9 @@ where
 
     /// Конструирует порождающий многочлен следующим образом:
     ///
-    /// `g(x) = (x + a^1)(x + a^2)...(x + a^(d-1))`
+    /// `g(x) = (x + a^0)(x + a^1)...(x + a^(control_count-1))`
     ///
-    /// где `a` - примитивный элемент, `d = n - k + 1` - расстояние Хэмминга.
+    /// где `a` - примитивный элемент.
     fn build_gen_poly(gf: &T, control_count: usize) -> Poly {
         let mut gen_poly = vec![1];
 
@@ -55,7 +55,7 @@ where
             let shifted_poly = gf.shift_poly(&gen_poly, 1);
 
             // Затем умножаем на α^i
-            let alpha_i = gf.pow(T::alpha(), i as u8);
+            let alpha_i = gf.alpha_pow(i as u8);
             gen_poly = gf.mul_poly(&gen_poly, &vec![alpha_i]);
 
             // Складываем с результатом умножения
@@ -76,7 +76,8 @@ where
         let mut syndromes = vec![0u8; self.control_count];
 
         for i in 0..self.control_count {
-            syndromes[i] = self.gf.eval_poly(data, self.gf.alpha_pow(i as u8))
+            let point = self.gf.alpha_pow(i as u8); // Используем α^i
+            syndromes[i] = self.gf.eval_poly(data, point);
         }
 
         syndromes
@@ -150,12 +151,16 @@ where
         }
 
         // Проверяем, что можем исправить найденное количество ошибок
-        if locator_degree * 2 > self.control_count {
+        // Можем исправить максимум control_count / 2 ошибок
+        if locator_degree > self.control_count / 2 {
             anyhow::bail!(
                 "Failed to find error locator: too many errors to correct \
-                (locator degree: {locator_degree}, control count: {}). \n\
-                Syndromes: {syndromes:?}",
+                (locator degree: {locator_degree}, control count: {}, max correctable: {}). \n\
+                Syndromes:\t{syndromes:?} \n\
+                Locator:\t{locator:?} \n\
+                Old Locator:\t{old_locator:?}",
                 self.control_count,
+                self.control_count / 2
             );
         }
 
@@ -174,9 +179,13 @@ where
         let mut positions = Vec::new();
         let expected_errors = error_locator.len() - 1;
 
+        // Проверяем все возможные позиции ошибок методом Чена
+        // L(x) имеет корни в обратных значениях локаторов ошибок
+        // Если L(α^(-i)) = 0, то ошибка в позиции i
         for i in 0..data_len {
-            let x = self.gf.inverse(self.gf.alpha_pow(i as u8)); // α^(-i)
-            let value = self.gf.eval_poly(error_locator, x);
+            let alpha_i = self.gf.alpha_pow(i as u8); // α^i
+            let alpha_inv = self.gf.inverse(alpha_i); // α^(-i)
+            let value = self.gf.eval_poly(error_locator, alpha_inv);
 
             if value == 0 {
                 positions.push(i);
@@ -216,8 +225,13 @@ where
         error_positions: &[usize],
         data_len: usize,
     ) -> Vec<u8> {
-        // W(x) = L(x)*S(x)
-        let omega = &self.gf.mul_poly(locator, syndromes)[..data_len - self.control_count];
+        // W(x) = L(x)*S(x), обрезаем до control_count
+        let omega_full = self.gf.mul_poly(locator, syndromes);
+        let omega = if omega_full.len() > self.control_count {
+            omega_full[..self.control_count].to_vec()
+        } else {
+            omega_full
+        };
 
         // Вычисляем производную локатора ошибок
         let locator_derivative = self.find_locator_derivative(&locator);
@@ -227,7 +241,7 @@ where
         for &err_pos in error_positions.iter() {
             let x_inv = self.gf.inverse(self.gf.alpha_pow(err_pos as u8));
 
-            let numerator = self.gf.eval_poly(omega, x_inv);
+            let numerator = self.gf.eval_poly(&omega, x_inv);
             let denominator = self.gf.eval_poly(&locator_derivative, x_inv);
 
             let magnitude = self.gf.div(numerator, denominator);
@@ -305,19 +319,17 @@ where
         }
 
         // Полином сдвигается на n-k позиций для контрольных символов
-        let mut message = vec![0; self.control_count];
-        message.extend_from_slice(data);
+        let mut encoded = vec![0; self.control_count];
+        encoded.extend_from_slice(data);
 
-        for (i, &n) in self
-            .gf
-            .mod_poly(&message, &self.gen_poly) // Вычисляем остаток от деления
-            .iter()
-            .enumerate()
-        {
-            message[i] = n;
+        // Вычисляем остаток от деления message на gen_poly
+        let remainder = self.gf.mod_poly(&encoded, &self.gen_poly);
+
+        for (i, &n) in remainder.iter().enumerate().take(self.control_count) {
+            encoded[i] = n;
         }
 
-        Ok(message)
+        Ok(encoded)
     }
 
     /// # Шаги декодирования
@@ -381,9 +393,7 @@ mod tests {
     mod encode;
     mod locator;
     mod syndromes;
+    mod utils;
 
-    // Вспомогательная функция для создания кодера с заданным количеством контрольных символов
-    fn create_encoder(control_count: usize) -> ReedSolomon<FastGF256> {
-        ReedSolomon::new(control_count, FastGF256::new())
-    }
+    pub use utils::{StressTestConfig, create_encoder, stress_test_common};
 }

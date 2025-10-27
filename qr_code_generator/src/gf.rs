@@ -197,8 +197,11 @@ pub trait GF256Poly: GF256 {
             }
         }
 
+        // Возвращаем реальный остаток
         let mut actual_remainder = remainder[..divisor.len() - 1].to_vec();
-        if actual_remainder.is_empty() || actual_remainder[actual_remainder.len() - 1] == 0 {
+        
+        // Если остаток пустой или все коэффициенты нулевые, возвращаем [0]
+        if actual_remainder.is_empty() || actual_remainder.iter().all(|&x| x == 0) {
             actual_remainder = vec![0];
         }
 

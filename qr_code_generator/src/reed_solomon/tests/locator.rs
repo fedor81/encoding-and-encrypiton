@@ -57,26 +57,36 @@ fn test_find_locator_derivative() {
     );
 }
 
-// #[test]
-// fn test_find_error_magnitudes() {
-//     let en = create_encoder(6);
+#[test]
+fn test_find_error_positions_stress() {
+    find_error_positions_stress_helper(StressTestConfig::new_one_error_config());
+}
 
-//     let syndromes = &vec![0, 15, 15, 2, 3, 9]; // S(x) = 15x + 15x^2 + 2x^3 + 3x^4 + 9x^5
-//     let locator = &vec![1, 6, 5, 4]; // L(x) = 1 + 6x + 5x^2 + 4x^3
+fn find_error_positions_stress_helper(cf: StressTestConfig) {
+    stress_test_common(cf, |context, encoder, message, encoded, err_encoded| {
+        // Actual
+        let syndromes = encoder.calculate_syndromes(&message);
+        let error_locator = encoder.find_error_locator(&syndromes).unwrap();
+        let mut error_positions = encoder
+            .find_error_positions(&error_locator, message.len())
+            .unwrap();
 
-//     Ошибка в тестовых данных
-//     assert_eq!(
-//         en.gf.mul_poly(syndromes, locator),
-//         vec![0, 15, 11, 19, 0, 53, 49, 33, 36] // 15x + 11x^2 + 19x^3 + 53x^5 + 49x^6 + 33x^7 + 36x^8
-//     );
+        error_positions.sort();
 
-//     assert_eq!(
-//         en.find_error_magnitudes(
-//             syndromes,
-//             locator,
-//             &vec![11, 3, 4], // Позиции ошибок
-//             15               // Длина полученного сообщения
-//         ),
-//         vec![7, 3, 2] // Значения ошибок
-//     );
-// }
+        *context += &format!(
+            "\nSyndromes:\t{syndromes:?}\n\
+            Error locator:\t{error_locator:?}\n\
+            Error positions:\t{error_positions:?}",
+        );
+
+        // Expected
+        let mut expected = Vec::new();
+        for (i, (&enc_char, &err_char)) in encoded.iter().zip(err_encoded.iter()).enumerate() {
+            if enc_char != err_char {
+                expected.push(i);
+            }
+        }
+
+        assert_eq!(expected, error_positions, "{}", context);
+    });
+}
