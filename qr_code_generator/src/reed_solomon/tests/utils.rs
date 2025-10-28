@@ -146,24 +146,20 @@ where
             context += &format!("\nEncoded:\t{encoded:?}");
 
             let err_encoded = cf.error_fn(&encoded);
+            let error_count = encoded
+                .iter()
+                .zip(err_encoded.iter())
+                .filter(|(e, err_e)| e != err_e)
+                .count();
+
             context += &format!(
-                "\nAfter Errors:\t{} Count: {}",
+                "\nAfter Errors:\t{} Count: {error_count}",
                 diff_highlight(&encoded, &err_encoded),
-                encoded
-                    .iter()
-                    .zip(err_encoded.iter())
-                    .filter(|(e, err_e)| e != err_e)
-                    .count(),
             );
 
-            assert_eq!(
-                encoded.len(),
-                err_encoded.len(),
-                "err_fn should not change length. {}",
-                context
-            );
+            assert_eq!(encoded.len(), err_encoded.len(), "err_fn changed length");
 
-            // Вызов уникальной логики теста
+            // Вызов логики теста
             test_logic(&mut context, &encoder, &message, &encoded, &err_encoded);
         }
     }
