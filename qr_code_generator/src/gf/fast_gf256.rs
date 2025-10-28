@@ -74,6 +74,12 @@ impl FastGF256 {
     }
 }
 
+impl Default for FastGF256 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GF256 for FastGF256 {
     fn alpha() -> u8 {
         2

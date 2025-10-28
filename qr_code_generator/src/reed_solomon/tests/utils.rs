@@ -1,3 +1,5 @@
+use pretty_assertions::assert_eq;
+
 use super::*;
 
 /// Вспомогательная функция для создания кодера с заданным количеством контрольных символов
@@ -28,13 +30,13 @@ pub struct StressTestConfig {
     pub encoders_count: usize,
     pub tests_by_encoder: usize,
 
-    pub max_control_count: usize,
     pub min_control_count: usize,
+    pub max_control_count: usize,
 
-    pub max_data_len: usize,
     pub min_data_len: usize,
+    pub max_data_len: usize,
 
-    pub error_fn: ErrorFn,
+    error_fn: ErrorFn,
 }
 
 impl StressTestConfig {
@@ -47,41 +49,49 @@ impl StressTestConfig {
         (self.error_fn)(poly)
     }
 
-    pub fn new_one_error_config() -> StressTestConfig {
-        let mut cf = StressTestConfig::default().with_error_fn(|poly| {
-            let mut modified = poly.to_vec();
-            let index = rand::random_range(0..poly.len()); // Случайный индекс
-
-            modified[index] = rand::random(); // Внесение ошибки
-            modified
-        });
-
-        // Чтобы кодировщик мог исправить t ошибок, контрольных символов должно быть 2t
-        cf.min_control_count = 2;
-        cf
-    }
-
-    pub fn new_five_errors_config() -> StressTestConfig {
-        let mut cf = StressTestConfig::default();
-
-        const ERRORS: usize = 5;
-
-        // Чтобы кодировщик мог исправить t ошибок, контрольных символов должно быть 2t
-        cf.min_control_count = 2 * ERRORS;
-        cf.max_control_count = 2 * ERRORS;
-
-        cf = cf.with_error_fn(|poly: RefPoly| {
+    pub fn with_n_errors_fn(self, n: usize) -> Self {
+        self.with_error_fn(move |poly: RefPoly| {
             let mut modified = poly.to_vec();
 
-            for _ in 0..ERRORS {
-                let index = rand::random_range(0..poly.len()); // Случайный индекс
+            for _ in 0..n {
+                // Получение индекса, где не было ошибок
+                let index = loop {
+                    let index = rand::random_range(0..poly.len());
+                    if modified[index] == poly[index] {
+                        break index;
+                    }
+                };
 
-                modified[index] = rand::random(); // Внесение ошибки
+                // Внесение ошибки
+                loop {
+                    let error = rand::random();
+                    if modified[index] != error {
+                        modified[index] = error;
+                        break;
+                    }
+                }
             }
 
             modified
-        });
-        cf
+        })
+    }
+
+    pub fn new_n_error_config(n: usize) -> Self {
+        let mut cf = Self::default();
+
+        // Чтобы кодировщик мог исправить t ошибок, контрольных символов должно быть 2t
+        cf.min_control_count = cf.min_control_count.max(2 * n);
+        cf.max_control_count = cf.max_control_count.max(2 * n);
+
+        cf.with_n_errors_fn(n)
+    }
+
+    pub fn new_one_error_config() -> StressTestConfig {
+        Self::new_n_error_config(1)
+    }
+
+    pub fn new_five_errors_config() -> StressTestConfig {
+        Self::new_n_error_config(5)
     }
 }
 
@@ -96,6 +106,19 @@ impl Default for StressTestConfig {
             min_data_len: 1,
             error_fn: Box::new(|poly: RefPoly| poly.to_vec()), // Не вносит ошибок
         }
+    }
+}
+
+impl std::fmt::Debug for StressTestConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StressTestConfig")
+            .field("encoders_count", &self.encoders_count)
+            .field("tests_by_encoder", &self.tests_by_encoder)
+            .field("min_control_count", &self.min_control_count)
+            .field("max_control_count", &self.max_control_count)
+            .field("min_data_len", &self.min_data_len)
+            .field("max_data_len", &self.max_data_len)
+            .finish()
     }
 }
 
@@ -114,6 +137,7 @@ where
             let mut context = format!(
                 "\nIteration: {}, \n\
                 Control Count: {control} \n\
+                Config: {cf:?} \n\
                 Message:\t{message:?}",
                 j * cf.tests_by_encoder + i // исправлена опечатка: было encoders_count
             );
@@ -123,9 +147,15 @@ where
 
             let err_encoded = cf.error_fn(&encoded);
             context += &format!(
-                "\nAfter Errors:\t{}",
-                diff_highlight(&encoded, &err_encoded)
+                "\nAfter Errors:\t{} Count: {}",
+                diff_highlight(&encoded, &err_encoded),
+                encoded
+                    .iter()
+                    .zip(err_encoded.iter())
+                    .filter(|(e, err_e)| e != err_e)
+                    .count(),
             );
+
             assert_eq!(
                 encoded.len(),
                 err_encoded.len(),
@@ -137,4 +167,28 @@ where
             test_logic(&mut context, &encoder, &message, &encoded, &err_encoded);
         }
     }
+}
+
+/// Проверка, что синдромы равны нулю
+pub fn check_syndromes(encoder: &ReedSolomon<FastGF256>, encoded: RefPoly) -> Result<()> {
+    let syndromes = encoder.calculate_syndromes(&encoded);
+
+    // Проверим деление вручную
+    let remainder = encoder.gf.mod_poly(&encoded, &encoder.gen_poly);
+
+    if syndromes.iter().any(|&s| s != 0) {
+        anyhow::bail!(
+            "Syndromes: {syndromes:?} should be all zero for \n\
+            Encoded: {encoded:?} \n\
+            Remainder after division encoded / gen_poly: {remainder:?} \n\
+            Generator polynomial: {:?} \n\
+            Powers Alpha: {:?}",
+            encoder.gen_poly,
+            (0..encoder.control_count)
+                .into_iter()
+                .map(|i| encoder.gf.alpha_pow(i as u8))
+                .collect::<Vec<_>>()
+        )
+    }
+    Ok(())
 }

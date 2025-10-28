@@ -1,6 +1,6 @@
 use super::*;
 
-fn decode_stress_test_helper(cf: StressTestConfig) {
+fn decode_stress_test_helper(cf: StressTestConfig) -> Result<()> {
     stress_test_common(cf, |context, encoder, message, encoded, err_encoded| {
         let decoded = encoder
             .decode(&err_encoded)
@@ -10,6 +10,7 @@ fn decode_stress_test_helper(cf: StressTestConfig) {
 
         assert_eq!(message, decoded, "{}", context);
     });
+    Ok(())
 }
 
 #[test]

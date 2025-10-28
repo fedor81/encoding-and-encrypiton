@@ -97,18 +97,21 @@ where
     fn find_error_locator(&self, syndromes: RefPoly) -> Result<Poly> {
         // C(x) - текущий полином локатора ошибок
         let mut locator = vec![1u8]; // C(x) = 1
-        let mut old_locator = vec![1u8]; // B(x) — копия последнего C(x) на момент обновления L или предыдущий C(x)
-        let mut locator_degree = 0; // текущая степень C(x)
-        let mut m = 1; // номер итерации, прошедших с обновления L
+        let mut old_locator = vec![1u8]; // B(x) — копия последнего C(x) на момент обновления L
+        let mut locator_degree = 0; // L - текущая степень C(x)
+        let mut m = 1; // сдвиг или номер итерации, прошедших с обновления L
+        let mut old_discrepancy = 1u8; // значение расхождения d на предыдущем шаге, когда мы обновляли L и сохраняли старый локатор или последнее ненулевое расхождение discrepancy
 
         for n in 0..self.control_count {
-            // Вычисляем расхождение d
-            let mut discrepancy = syndromes[n];
+            // В little-endian: locator[i] соответствует коэффициенту при x^i
 
-            // d = Sn + C₁ * S{n-1} + C₂ * S{n-2} + ... + CL * S{n-L}
+            // Вычисляем расхождение d = Sn + C₁ * S{n-1} + C₂ * S{n-2} + ... + CL * S{n-L}
+            let mut discrepancy = syndromes[n];
             for i in 1..=locator_degree {
-                let product = self.gf.mul(locator[i], syndromes[n - i]);
-                discrepancy = self.gf.add(discrepancy, product);
+                if i < locator.len() && i <= n {
+                    let product = self.gf.mul(locator[i], syndromes[n - i]);
+                    discrepancy = self.gf.add(discrepancy, product);
+                }
             }
 
             // Если d равно нулю, это значит C(x) и L на данный момент верны, достаточно инкрементировать m и продолжить итерации.
@@ -117,36 +120,35 @@ where
                 continue;
             }
 
-            // Если d ненулевое, алгоритм поправляет C(x) так, чтобы его обнулить d:
+            // Если d ненулевое, алгоритм поправляет C(x) так, чтобы его обнулить:
             // C(x) = C(x) - (d/b)·B(x)·x^m, где B(x) – предыдущий C(x), b - копия последнего расхождения d
 
+            // Масштабируем old_locator на (d / b)
+            let scale = self.gf.div(discrepancy, old_discrepancy);
+            let scaled_old = self.gf.scale_poly(&old_locator, scale);
+
             // Умножение на x^m — это, по сути, сдвиг коэффициентов B(x) на m
+            let shifted_scaled_old = self.gf.shift_poly(&scaled_old, m);
 
-            // Если 2L ≤ n: кардинально меняем локатор
+            // Если 2L ≤ n: Обновляем степень и предыдущий локатор
             if 2 * locator_degree <= n {
-                // Сохраняем текущий локатор
-                let temp = locator.clone();
-
-                // Вычисляем новый локатор
-                let scale = self.gf.div(discrepancy, old_locator[0]);
-                let scaled_old = self.gf.scale_poly(&old_locator, scale);
-                let shifted_scaled_old = self.gf.shift_poly(&scaled_old, m);
-
-                locator = self.gf.add_poly(&locator, &shifted_scaled_old);
-
-                // Обновляем степень и предыдущий локатор
+                // Обновляем L и B(x)
                 locator_degree = n + 1 - locator_degree;
-                old_locator = temp;
+                old_locator = locator.clone();
+                old_discrepancy = discrepancy;
                 m = 1;
 
-            // Если 2L > n: только корректируем текущий локатор
+            // Если 2L > n, то после корректировки локатора ничего не меняем
             } else {
-                let scale = self.gf.div(discrepancy, old_locator[0]);
-                let scaled_old = self.gf.scale_poly(&old_locator, scale);
-                let shifted_scaled_old = self.gf.shift_poly(&scaled_old, m);
-
-                locator = self.gf.add_poly(&locator, &shifted_scaled_old);
                 m += 1;
+            }
+
+            // Корректируем локатор: C(x) += (d/b) * B(x) * x^m
+            locator = self.gf.add_poly(&locator, &shifted_scaled_old); // Сложение и вычитание - одно и то же
+
+            // Обрезаем ведущие нули (в little-endian нули в конце)
+            while locator.len() > 1 && *locator.last().unwrap() == 0 {
+                locator.pop();
             }
         }
 
@@ -158,7 +160,7 @@ where
                 (locator degree: {locator_degree}, control count: {}, max correctable: {}). \n\
                 Syndromes:\t{syndromes:?} \n\
                 Locator:\t{locator:?} \n\
-                Old Locator:\t{old_locator:?}",
+                Old Loc:\t{old_locator:?}",
                 self.control_count,
                 self.control_count / 2
             );
@@ -384,9 +386,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::gf::FastGF256;
-
     use super::*;
+    use crate::gf::FastGF256;
 
     mod build_gen_poly;
     mod decode;
@@ -395,5 +396,5 @@ mod tests {
     mod syndromes;
     mod utils;
 
-    pub use utils::{StressTestConfig, create_encoder, stress_test_common};
+    pub use utils::{StressTestConfig, check_syndromes, create_encoder, stress_test_common};
 }
