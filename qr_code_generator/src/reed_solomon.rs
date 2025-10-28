@@ -225,15 +225,10 @@ where
         syndromes: RefPoly,
         locator: RefPoly,
         error_positions: &[usize],
-        data_len: usize,
     ) -> Vec<u8> {
-        // W(x) = L(x)*S(x), обрезаем до control_count
-        let omega_full = self.gf.mul_poly(locator, syndromes);
-        let omega = if omega_full.len() > self.control_count {
-            omega_full[..self.control_count].to_vec()
-        } else {
-            omega_full
-        };
+        // W(x) = L(x)*S(x) mod x^{control_count}
+        let mut omega = self.gf.mul_poly(locator, syndromes);
+        omega.truncate(self.control_count);
 
         // Вычисляем производную локатора ошибок
         let locator_derivative = self.find_locator_derivative(&locator);
@@ -241,12 +236,15 @@ where
         let mut magnitudes = Vec::new();
 
         for &err_pos in error_positions.iter() {
-            let x_inv = self.gf.inverse(self.gf.alpha_pow(err_pos as u8));
+            let alpha_i = self.gf.alpha_pow(err_pos as u8);
+            let alpha_inv = self.gf.inverse(alpha_i);
 
-            let numerator = self.gf.eval_poly(&omega, x_inv);
-            let denominator = self.gf.eval_poly(&locator_derivative, x_inv);
+            let numerator = self.gf.eval_poly(&omega, alpha_inv);
+            let denominator = self.gf.eval_poly(&locator_derivative, alpha_inv);
 
-            let magnitude = self.gf.div(numerator, denominator);
+            let division = self.gf.div(numerator, denominator);
+            let magnitude = self.gf.mul(division, alpha_i);
+
             magnitudes.push(magnitude);
         }
 
@@ -360,7 +358,7 @@ where
         let error_locator = self.find_error_locator(&syndromes)?;
         let error_positions = self.find_error_positions(&error_locator, data.len())?;
         let error_magnitudes =
-            self.find_error_magnitudes(&syndromes, &error_locator, &error_positions, data.len());
+            self.find_error_magnitudes(&syndromes, &error_locator, &error_positions);
 
         // Исправляем ошибки
         let corrected = self.correct_errors(data, &error_positions, &error_magnitudes);
