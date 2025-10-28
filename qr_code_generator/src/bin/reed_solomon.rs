@@ -23,13 +23,14 @@ fn main() -> Result<()> {
         Command::Encode {
             input,
             input_format,
+            output_format,
         } => {
             let data = input_format.parse_input_data(&input)?;
             let block_size = MAX_BLOCK_SIZE - cli.controls;
 
             let encoded = rs.encode_blocks_to_vec(&data, block_size)?;
 
-            println!("{}", DataFormat::to_hex(&encoded));
+            println!("{}", output_format.parse(&encoded)?);
         }
         Command::Decode {
             input,
@@ -69,9 +70,13 @@ enum Command {
         /// Входные данные
         input: String,
 
-        /// Тип данных
-        #[arg(short, long, default_value = "auto")]
+        /// Тип входных данных
+        #[arg(long, default_value = "auto")]
         input_format: DataFormat,
+
+        /// Тип выходных данных
+        #[arg(long, default_value = "hex")]
+        output_format: OutputFormat,
     },
 
     /// Декодировать данные
@@ -83,9 +88,29 @@ enum Command {
         #[arg(long, default_value = "auto")]
         input_format: DataFormat,
 
+        /// Тип выходных данных
         #[arg(long, default_value = "auto")]
         output_format: DataFormat,
     },
+}
+
+/// Выходной формат — только для бинарных данных
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum OutputFormat {
+    /// Шестнадцатеричная строка без 0x (например: a1b2c3)
+    Hex,
+
+    /// Байты через пробел (например: 10 20 255)
+    Bytes,
+}
+
+impl OutputFormat {
+    fn parse(&self, data: &[u8]) -> Result<String> {
+        match self {
+            OutputFormat::Hex => Ok(DataFormat::bytes_to_hex(data)),
+            OutputFormat::Bytes => Ok(DataFormat::bytes_to_string(data)),
+        }
+    }
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -106,28 +131,32 @@ enum DataFormat {
 impl DataFormat {
     fn parse(&self, data: &[u8]) -> Result<String> {
         match self {
-            DataFormat::Text => Self::to_text(data),
-            DataFormat::Hex => Ok(Self::to_hex(&data)),
+            DataFormat::Text => Self::bytes_to_text(data),
+            DataFormat::Hex => Ok(Self::bytes_to_hex(&data)),
             DataFormat::Auto => {
-                let text = Self::to_text(data);
+                let text = Self::bytes_to_text(data);
                 if text.is_ok() {
                     text
                 } else {
-                    Ok(Self::to_hex(data))
+                    Ok(Self::bytes_to_hex(data))
                 }
             }
-            DataFormat::Bytes => Ok(format!(
-                "{}",
-                data.iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            )),
+            DataFormat::Bytes => Ok(Self::bytes_to_string(data)),
         }
     }
 
+    fn bytes_to_string(data: &[u8]) -> String {
+        format!(
+            "{}",
+            data.iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+
     /// Попытка интерпретировать как UTF-8
-    fn to_text(data: &[u8]) -> Result<String> {
+    fn bytes_to_text(data: &[u8]) -> Result<String> {
         if let Ok(utf8_str) = std::str::from_utf8(data) {
             // Проверим, что строка "печатающаяся" и не содержит мусора
             // (опционально: можно пропустить проверку и выводить всё)
@@ -141,7 +170,7 @@ impl DataFormat {
         anyhow::bail!("Не удалось декодировать как UTF-8: {:#?}", data)
     }
 
-    fn to_hex(bytes: &[u8]) -> String {
+    fn bytes_to_hex(bytes: &[u8]) -> String {
         bytes
             .iter()
             .map(|b| format!("{:02x}", b))
@@ -257,7 +286,7 @@ mod tests {
             let message = rand::random_iter().take(10).collect::<Vec<_>>();
 
             let encoded = rs.encode(&message).unwrap();
-            let hex_encoded = DataFormat::to_hex(&encoded);
+            let hex_encoded = DataFormat::bytes_to_hex(&encoded);
 
             let dehexed = DataFormat::Hex.parse_input_data(&hex_encoded).unwrap();
             let decoded = rs.decode(&dehexed).unwrap();
