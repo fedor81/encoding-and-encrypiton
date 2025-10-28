@@ -318,26 +318,3 @@ fn test_random_stress() {
     }
 }
 
-/// Проверка, что синдромы равны нулю
-fn check_syndromes(encoder: &ReedSolomon<FastGF256>, encoded: RefPoly) -> Result<()> {
-    let syndromes = encoder.calculate_syndromes(&encoded);
-
-    // Проверим деление вручную
-    let remainder = encoder.gf.mod_poly(&encoded, &encoder.gen_poly);
-
-    if syndromes.iter().any(|&s| s != 0) {
-        anyhow::bail!(
-            "Syndromes: {syndromes:?} should be all zero for \n\
-            Encoded: {encoded:?} \n\
-            Remainder after division encoded / gen_poly: {remainder:?} \n\
-            Generator polynomial: {:?} \n\
-            Powers Alpha: {:?}",
-            encoder.gen_poly,
-            (0..encoder.control_count)
-                .into_iter()
-                .map(|i| encoder.gf.alpha_pow(i as u8))
-                .collect::<Vec<_>>()
-        )
-    }
-    Ok(())
-}
