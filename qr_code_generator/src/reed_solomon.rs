@@ -370,13 +370,13 @@ where
         if syndromes_after.iter().any(|&s| s != 0) {
             anyhow::bail!(
                 "Could not correct all errors. \n\
-                Original data:\t {data:?}, \n\
-                Corrected data:\t {corrected:?}, \n\
-                Error locator: {error_locator:?}, \n\
-                Error positions: {error_positions:?}, \n\
-                Error magnitudes: {error_magnitudes:?}, \n\
-                Syndromes before:\t {syndromes:?}, \n\
-                Syndromes after:\t {syndromes_after:?}",
+                Original data:\t{data:?}, \n\
+                Corrected data:\t{corrected:?}, \n\
+                Error locator:\t{error_locator:?}, \n\
+                Error positions:\t{error_positions:?}, \n\
+                Error magnitudes:\t{error_magnitudes:?}, \n\
+                Syndromes before:\t{syndromes:?}, \n\
+                Syndromes after:\t{syndromes_after:?}",
             );
         }
 

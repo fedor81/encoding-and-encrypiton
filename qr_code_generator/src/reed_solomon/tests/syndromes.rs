@@ -47,7 +47,9 @@ fn test_syndromes_for_encoded_stress() {
 
     stress_test_common(config, |context, encoder, message, encoded, err_encoded| {
         // Проверяем, что для корректно закодированных данных синдромы нулевые
-        check_syndromes(&encoder, &encoded).unwrap();
+        check_syndromes(&encoder, &encoded)
+            .with_context(|| format!("{}", context))
+            .unwrap();
     });
 }
 
