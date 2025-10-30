@@ -156,11 +156,19 @@ fn test_build_gen_poly_edge_cases() {
         2,
         "Generator polynomial for nsym=1 should have length 2"
     );
-    assert_eq!(gen_poly_1[gen_poly_1.len() - 1], 1, "Leading coefficient should be 1");
-    
+    assert_eq!(
+        gen_poly_1[gen_poly_1.len() - 1],
+        1,
+        "Leading coefficient should be 1"
+    );
+
     // Проверяем корень α^0
     let root = gf.pow_primitive_poly(0);
-    assert_eq!(gf.eval_poly(&gen_poly_1, root), 0, "Root α^0 should be zero");
+    assert_eq!(
+        gf.eval_poly(&gen_poly_1, root),
+        0,
+        "Root α^0 should be zero"
+    );
 
     // nsym = максимальное разумное значение
     let gen_poly_large = ReedSolomon::build_gen_poly(&gf, 32);
@@ -262,7 +270,7 @@ fn test_against_known_vectors() {
                          // Добавьте другие известные значения здесь
     ];
 
-    for (nsym, expected) in test_cases {
+    for (nsym, _expected) in test_cases {
         let actual = ReedSolomon::build_gen_poly(&gf, nsym);
 
         // Поскольку точные значения зависят от реализации,

@@ -65,7 +65,7 @@ fn find_error_locator_error_1_to_10() {
     for n in 1..=10 {
         let cf = StressTestConfig::new_n_error_config(n);
 
-        stress_test_common(cf, |context, encoder, message, encoded, err_encoded| {
+        stress_test_common(cf, |context, encoder, _message, _encoded, err_encoded| {
             let syndromes = encoder.calculate_syndromes(&err_encoded);
             *context += &format!("\nSyndromes:\t{syndromes:?}");
 

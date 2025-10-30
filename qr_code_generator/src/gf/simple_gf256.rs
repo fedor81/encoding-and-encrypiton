@@ -1,5 +1,6 @@
 use super::{GF256, PRIMITIVE_POLY};
 
+/// Упрощенная реализация поля GF(256), не использующая таблицы экспонент и логарифмов.
 pub struct SimpleGF256 {}
 
 impl SimpleGF256 {

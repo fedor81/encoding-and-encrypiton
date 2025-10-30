@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
-use qr_code_generator::{BlockCoder, Coder, new_reed_solomon_fast_gf256};
+use qr_code_generator::{BlockCoder, Coder, new_reed_solomon};
 
 const MAX_BLOCK_SIZE: usize = 255;
 
@@ -17,7 +15,7 @@ fn main() -> Result<()> {
         );
     }
 
-    let rs = new_reed_solomon_fast_gf256(cli.controls);
+    let rs = new_reed_solomon(cli.controls);
 
     match cli.command {
         Command::Encode {
@@ -282,7 +280,7 @@ mod tests {
     #[test]
     fn test_hex() {
         for n in 0..100 {
-            let rs = new_reed_solomon_fast_gf256(n);
+            let rs = new_reed_solomon(n);
             let message = rand::random_iter().take(10).collect::<Vec<_>>();
 
             let encoded = rs.encode(&message).unwrap();
