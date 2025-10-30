@@ -1,7 +1,7 @@
 use super::*;
 
 fn decode_stress_test_helper(cf: StressTestConfig) {
-    stress_test_common(cf, |context, encoder, message, encoded, err_encoded| {
+    stress_test_common(cf, |context, encoder, message, _encoded, err_encoded| {
         let decoded = encoder
             .decode(&err_encoded)
             .with_context(|| format!("{}", context))
