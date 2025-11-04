@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
-use qr_code_generator::{BlockCoder, Coder, new_reed_solomon};
+use reed_solomon::{BlockCoder, Coder, new_reed_solomon};
 
 const MAX_BLOCK_SIZE: usize = 255;
 

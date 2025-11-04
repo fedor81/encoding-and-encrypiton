@@ -1,10 +1,10 @@
 use anyhow::Result;
 
-mod coder;
+mod coder_trait;
 pub mod gf;
 mod reed_solomon;
 
-pub use coder::{BlockCoder, Coder};
+pub use coder_trait::{BlockCoder, Coder};
 pub use reed_solomon::ReedSolomon;
 
 /// Представление полинома в поле GF(256). Старший индекс - старший коэффициент.
