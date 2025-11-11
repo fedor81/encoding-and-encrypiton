@@ -3,7 +3,7 @@
 pub type Encoding = [u8; 11];
 
 // Character -> Binary mappings for each of the allowable characters in each character-set.
-pub const CHARS: [([&str; 3], Encoding); 106] = [
+pub const CHARS: [([&str; 3], Encoding); 107] = [
     ([" ", " ", "00"], [1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0]),
     (["!", "!", "01"], [1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0]),
     (["\"", "\"", "02"], [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0]),
@@ -134,6 +134,7 @@ pub const CHARS: [([&str; 3], Encoding); 106] = [
         ["START-Ć", "START-Ć", "START-Ć"],
         [1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0],
     ),
+    (["STOP", "STOP", "STOP"], [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0]), // Added STOP character
 ];
 
 // Stop sequence.
