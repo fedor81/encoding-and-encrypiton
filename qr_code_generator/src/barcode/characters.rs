@@ -142,3 +142,6 @@ pub const STOP: Encoding = [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0];
 
 // Termination sequence.
 pub const TERM: [u8; 2] = [1, 1];
+
+/// Длина одного кодового слова.
+pub const CODE_LEN: usize = 11;
