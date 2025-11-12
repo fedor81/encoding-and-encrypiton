@@ -1,29 +1,27 @@
-//! Code 128:
-//!
-//! - Кодирует любые символы ASCII (цифры, буквы, специальные символы).
-//! - Очень высокая плотность — помещается больше информации в меньшее пространство.
-//! - Нет необходимости в регистрации — можно использовать произвольные данные.
-//! - Поддерживается большинством сканеров.
-//! - Широко используется в логистике, складской системе, упаковке.
-
 use anyhow::Result;
 
 mod characters;
+mod code_set;
+mod unit;
 
 use characters::{CHARS, CODE_LEN, Encoding};
+use code_set::CodeSet;
+use unit::Unit;
 
-/// # Общие принципы
+/// # Code 128
 ///
-/// 1. Кодирует символы ASCII:
-///   - Поддерживает символы с кодами от 0 до 127 (все символы ASCII).
-///   - Включает цифры, буквы, знаки препинания, управляющие символы (например, FNC1, FNC2 и др.).
+/// - Кодирует любые символы ASCII (цифры, буквы, специальные символы).
+/// - Очень высокая плотность — помещается больше информации в меньшее пространство.
+/// - Нет необходимости в регистрации — можно использовать произвольные данные.
+/// - Поддерживается большинством сканеров.
+/// - Широко используется в логистике, складской системе, упаковке.
 ///
-/// 2. Три набора символов (A, B, C):
+/// Три набора символов (A, B, C):
 ///   - `Code Set A` — символы с кодами 0–95: A-Z, 0-9, специальные символы и FNC 1-4.
 ///   - `Code Set B` — ASCII символы с кодами 32–127: A-Z, a-z, 0-9, специальные символы и FNC 1-4.
 ///   - `Code Set C` — используется для парных цифр (00–99). Позволяет компактно кодировать числа: две цифры кодируются одним символом.
 ///
-/// 3. Переключение между наборами:
+/// Переключение между наборами:
 ///   - Можно переключаться между наборами внутри одного штрих-кода с помощью специальных символов:
 ///       - `À | Ɓ | Ć` — переключение на постоянной основе.
 ///
@@ -50,33 +48,12 @@ use characters::{CHARS, CODE_LEN, Encoding};
 /// Code128::encode("ƁHello World").unwrap();
 /// Code128::encode_with_codeset("Hello World", CodeSet::B).unwrap();
 /// ```
+///
 #[derive(Debug, Clone, Default)]
 pub struct Code128<'a> {
     data: &'a str,
     encoded: Vec<Unit>,
     codeset: CodeSet,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct Unit {
-    index: usize,
-}
-
-/// Три набора символов (A, B, C):
-/// - `Code Set A` — символы с кодами 0–95: A-Z, 0-9, специальные символы и FNC 1-4
-/// - `Code Set B` — ASCII символы с кодами 32–127: A-Z, a-z, 0-9, специальные символы и FNC 1-4
-/// - `Code Set C` — используется для парных цифр (00–99). Позволяет компактно кодировать числа: две цифры кодируются одним символом
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CodeSet {
-    A,
-    B,
-    C,
-}
-
-impl Default for CodeSet {
-    fn default() -> Self {
-        Self::B
-    }
 }
 
 impl<'a> Code128<'a> {
@@ -197,93 +174,14 @@ impl<'a> Code128<'a> {
     }
 
     fn checksum(data: &[Unit]) -> Unit {
-        Unit {
-            index: data
-                .iter()
-                .map(|unit| unit.index)
+        Unit::from(
+            data.iter()
+                .map(|unit| unit.index())
                 .enumerate()
                 .map(|(position, code_idx)| code_idx * (position + 1))
                 .sum::<usize>()
                 % 103,
-        }
-    }
-}
-
-impl TryFrom<char> for CodeSet {
-    type Error = anyhow::Error;
-
-    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
-        Ok(match value {
-            'À' => CodeSet::A,
-            'Ɓ' => CodeSet::B,
-            'Ć' => CodeSet::C,
-            _ => anyhow::bail!(
-                "Cannot define CodeSet by character: {}.\
-                CodeSet can be defined by one of the following: À, Ɓ, Ć",
-                value
-            ),
-        })
-    }
-}
-
-impl CodeSet {
-    fn index(self) -> usize {
-        match self {
-            CodeSet::A => 0,
-            CodeSet::B => 1,
-            CodeSet::C => 2,
-        }
-    }
-
-    fn parse(self, pattern: &str) -> Result<Unit> {
-        let set_index = self.index();
-
-        match CHARS
-            .iter()
-            .position(|charset| charset.0[set_index] == pattern)
-        {
-            Some(index) => Ok(Unit { index }),
-            None => anyhow::bail!("CodeSet::{:?} does not contains char: {}", self, pattern),
-        }
-    }
-
-    fn start_unit(self) -> Unit {
-        match self {
-            CodeSet::A => Unit::from(103),
-            CodeSet::B => Unit::from(104),
-            CodeSet::C => Unit::from(105),
-        }
-    }
-}
-
-impl Unit {
-    fn encoding(self) -> Encoding {
-        CHARS[self.index].1
-    }
-}
-
-impl From<usize> for Unit {
-    fn from(index: usize) -> Self {
-        if index < CHARS.len() {
-            Unit { index }
-        } else {
-            panic!("Available units from 0 to {}", CHARS.len())
-        }
-    }
-}
-
-impl From<Encoding> for Unit {
-    fn from(pattern: Encoding) -> Self {
-        match CHARS.iter().position(|charset| charset.1 == pattern) {
-            Some(index) => Unit { index },
-            None => panic!("CHARS does not contains code: {:?}", pattern),
-        }
-    }
-}
-
-impl std::fmt::Debug for Unit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Unit").field(&self.index).finish()
+        )
     }
 }
 
@@ -356,12 +254,12 @@ mod tests {
             .encode_payload()
             .unwrap()
             .into_iter()
-            .map(|unit| unit.index)
+            .map(|unit| unit.index())
             .collect::<Vec<_>>();
         let expected = expected
             .iter()
             .copied()
-            .map(|encoding| Unit::from(encoding).index)
+            .map(|encoding| Unit::from(encoding).index())
             .collect::<Vec<_>>();
 
         assert_eq!(expected, actual);
@@ -384,7 +282,7 @@ mod tests {
 
         let actual = Code128::convert_to_units(&actual)
             .into_iter()
-            .map(|unit| unit.index)
+            .map(|unit| unit.index())
             .collect::<Vec<_>>();
 
         assert_eq!(expected, actual, "start codeset = {:?}", codeset);
