@@ -10,7 +10,7 @@ use anyhow::Result;
 
 mod characters;
 
-use characters::{CHARS, Encoding, STOP, TERM};
+use characters::{CHARS, CODE_LEN, Encoding};
 
 /// # Общие принципы
 ///
@@ -19,13 +19,13 @@ use characters::{CHARS, Encoding, STOP, TERM};
 ///   - Включает цифры, буквы, знаки препинания, управляющие символы (например, FNC1, FNC2 и др.).
 ///
 /// 2. Три набора символов (A, B, C):
-///   - `Code Set A` — символы с кодами 0–95 (A-Z, 0-9, специальные символы и FNC 1-4).
-///   - `Code Set B` — ASCII символы с кодами 32–127 (A-Z, a-z, 0-9, специальные символы и FNC 1-4).
+///   - `Code Set A` — символы с кодами 0–95: A-Z, 0-9, специальные символы и FNC 1-4.
+///   - `Code Set B` — ASCII символы с кодами 32–127: A-Z, a-z, 0-9, специальные символы и FNC 1-4.
 ///   - `Code Set C` — используется для парных цифр (00–99). Позволяет компактно кодировать числа: две цифры кодируются одним символом.
 ///
 /// 3. Переключение между наборами:
 ///   - Можно переключаться между наборами внутри одного штрих-кода с помощью специальных символов:
-///       - `CODE A, CODE B, CODE C` — переключение на постоянной основе.
+///       - `À | Ɓ | Ć` — переключение на постоянной основе.
 ///
 /// # Структура штрих-кода Code 128
 ///
@@ -42,102 +42,156 @@ use characters::{CHARS, Encoding, STOP, TERM};
 ///   - Обозначает окончание штрих-кода.
 ///   - Одинаков для всех наборов.
 ///
-/// # Особенности
+/// # Examples
 ///
-/// - Каждый символ (включая стартовый, данные и контрольную сумму) представлен шаблоном штрихов и пробелов.
-/// - Всего в символе 6 элементов (3 штриха и 3 пробела).
-/// - Ширина элементов может быть 1, 2, 3 или 4 модуля.
-/// - Общая ширина всех 6 элементов всегда равна 11 модулям.
-struct Code128;
+/// ```
+/// use qr_code_generator::barcode::{Code128, CodeSet};
+///
+/// Code128::encode("ƁHello World").unwrap();
+/// Code128::encode_with_codeset("Hello World", CodeSet::B).unwrap();
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct Code128<'a> {
+    data: &'a str,
+    encoded: Vec<Unit>,
+    codeset: CodeSet,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Unit {
     index: usize,
 }
 
-impl std::fmt::Debug for Unit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Unit").field(&self.index).finish()
-    }
-}
-
+/// Три набора символов (A, B, C):
+/// - `Code Set A` — символы с кодами 0–95: A-Z, 0-9, специальные символы и FNC 1-4
+/// - `Code Set B` — ASCII символы с кодами 32–127: A-Z, a-z, 0-9, специальные символы и FNC 1-4
+/// - `Code Set C` — используется для парных цифр (00–99). Позволяет компактно кодировать числа: две цифры кодируются одним символом
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CodeSet {
+pub enum CodeSet {
     A,
     B,
     C,
 }
 
-impl Code128 {
-    pub fn encode(data: &str) -> Result<Vec<u8>> {
-        let encoded = Self::_encode(data)?;
-        Ok(Self::convert(
+impl Default for CodeSet {
+    fn default() -> Self {
+        Self::B
+    }
+}
+
+impl<'a> Code128<'a> {
+    /// # Important
+    /// Предполагается, что стартовый символ не включен в data!
+    fn new(data: &'a str, codeset: CodeSet) -> Self {
+        Self {
+            data,
+            encoded: vec![codeset.start_unit()],
+            codeset,
+        }
+    }
+
+    /// Определение стартового набора по первому символу и его кодирование
+    fn build_from_first_char(data: &'a str) -> Result<Self> {
+        let first_char = data.chars().next().unwrap();
+        let codeset = CodeSet::try_from(first_char)?;
+        let coder = Self::new(&data[2..], codeset); // Обрезаем первый символ: À | Ɓ | Ć
+        Ok(coder)
+    }
+
+    /// Автоматически определяет набор по первому символу и кодирует данные
+    pub fn encode(data: &'a str) -> Result<Vec<u8>> {
+        let coder = Self::build_from_first_char(data)?;
+        coder.encode_and_convert()
+    }
+
+    /// Кодирует сообщение начиная с определённого набора
+    pub fn encode_with_codeset(data: &'a str, codeset: CodeSet) -> Result<Vec<u8>> {
+        let coder = Self::new(data, codeset);
+        coder.encode_and_convert()
+    }
+
+    /// Кодирует сообщение и конвертирует в сплошной вектор
+    fn encode_and_convert(self) -> Result<Vec<u8>> {
+        let encoded = self.encode_payload()?;
+        Ok(Self::convert_to_result(
             encoded.into_iter().map(|unit| unit.encoding()),
         ))
     }
 
-    fn _encode(data: &str) -> Result<Vec<Unit>> {
-        let mut encoded = Vec::new();
-
-        // Определение стартового набора
-        let first_char = data.chars().next().unwrap();
-        let mut codeset = CodeSet::try_from(first_char)?;
-
-        encoded.push(
-            codeset
-                .parse(&format!("START-{}", first_char))
-                .expect("If you managed to parse the CodeSet, then this is a valid char"),
-        );
-
+    /// # Предупреждение
+    /// Предполагается, что стартовый символ не включен в сообщение!
+    fn encode_payload(mut self) -> Result<Vec<Unit>> {
         let mut carry = None;
 
-        for current in data.chars().skip(1) {
+        for current in self.data.chars() {
             let unit;
 
             match current {
                 // Управление набором
                 'À' | 'Ɓ' | 'Ć' => {
-                    unit = codeset.parse(current.to_string().as_str())?;
-                    codeset = CodeSet::try_from(current)?;
+                    unit = self.codeset.parse(current.to_string().as_str())?;
+                    self.codeset = CodeSet::try_from(current)?;
                 }
 
                 // Парные цифры
-                current if current.is_ascii_digit() && codeset == CodeSet::C => match carry {
+                current if current.is_ascii_digit() && self.codeset == CodeSet::C => match carry {
                     None => {
                         carry = Some(current);
                         continue;
                     }
                     Some(prev) => {
-                        unit = codeset.parse(&format!("{}{}", prev, current))?;
+                        unit = self.codeset.parse(&format!("{}{}", prev, current))?;
                         carry = None;
                     }
                 },
 
                 // Простое кодирование
-                _ => unit = codeset.parse(current.to_string().as_str())?,
+                _ => unit = self.codeset.parse(current.to_string().as_str())?,
             }
 
-            encoded.push(unit);
+            self.encoded.push(unit);
         }
 
         if let Some(carry) = carry {
-            anyhow::bail!("Last carry is not empty: {}, CodeSet::{:?}", carry, codeset);
+            anyhow::bail!(
+                "Last carry is not empty: {}, CodeSet::{:?}",
+                carry,
+                self.codeset
+            );
         }
 
         // Завершение: контрольная сумма и стоп символ
-        encoded.push(Self::checksum(&encoded));
-        encoded.push(codeset.parse("STOP")?);
+        self.encoded.push(Self::checksum(&self.encoded));
+        self.encoded.push(self.codeset.parse("STOP")?);
 
-        Ok(encoded)
+        Ok(self.encoded)
     }
 
-    fn convert<I>(data: I) -> Vec<u8>
+    fn convert_to_result<I>(data: I) -> Vec<u8>
     where
         I: IntoIterator<Item = Encoding>,
     {
         let mut result = Vec::new();
         for code in data {
             result.extend_from_slice(&code);
+        }
+        result
+    }
+
+    #[cfg(test)]
+    fn convert_to_units(data: &[u8]) -> Vec<Unit> {
+        if data.len() % CODE_LEN != 0 {
+            panic!()
+        }
+
+        let mut result = Vec::with_capacity(data.len() / CODE_LEN);
+        let mut encoding = [0u8; CODE_LEN];
+
+        for i in 0..(data.len() / CODE_LEN) {
+            for j in 0..CODE_LEN {
+                encoding[j] = data[i * CODE_LEN + j]
+            }
+            result.push(Unit::from(encoding));
         }
         result
     }
@@ -192,15 +246,19 @@ impl CodeSet {
             None => anyhow::bail!("CodeSet::{:?} does not contains char: {}", self, pattern),
         }
     }
+
+    fn start_unit(self) -> Unit {
+        match self {
+            CodeSet::A => Unit::from(103),
+            CodeSet::B => Unit::from(104),
+            CodeSet::C => Unit::from(105),
+        }
+    }
 }
 
 impl Unit {
     fn encoding(self) -> Encoding {
         CHARS[self.index].1
-    }
-
-    pub fn new(index: usize) -> Self {
-        Self { index }
     }
 }
 
@@ -220,6 +278,12 @@ impl From<Encoding> for Unit {
             Some(index) => Unit { index },
             None => panic!("CHARS does not contains code: {:?}", pattern),
         }
+    }
+}
+
+impl std::fmt::Debug for Unit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Unit").field(&self.index).finish()
     }
 }
 
@@ -286,8 +350,10 @@ mod tests {
         [1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0], // Checksum = 29
         [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0]] // STOP
     )]
-    fn code128_encode(#[case] input: &str, #[case] expected: Vec<Encoding>) {
-        let actual = Code128::_encode(input)
+    fn code128_encode_payload(#[case] input: &str, #[case] expected: Vec<Encoding>) {
+        let actual = Code128::build_from_first_char(input)
+            .unwrap()
+            .encode_payload()
             .unwrap()
             .into_iter()
             .map(|unit| unit.index)
@@ -299,5 +365,28 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(expected, actual);
+    }
+
+    #[rstest]
+    #[case("À\u{0000}\u{017A}Ć6369Ɓl`", vec![103, 64, 97, 99, 63, 69, 100, 76, 64, 29, 106], None)]
+    #[case("\u{0000}\u{017A}", vec![103, 64, 97, 7, 106], Some(CodeSet::A))]
+    fn code128_test(
+        #[case] input: &str,
+        #[case] expected: Vec<usize>,
+        #[case] codeset: Option<CodeSet>,
+    ) {
+        let actual = if let Some(codeset) = codeset {
+            Code128::encode_with_codeset(input, codeset)
+        } else {
+            Code128::encode(input)
+        }
+        .unwrap();
+
+        let actual = Code128::convert_to_units(&actual)
+            .into_iter()
+            .map(|unit| unit.index)
+            .collect::<Vec<_>>();
+
+        assert_eq!(expected, actual, "start codeset = {:?}", codeset);
     }
 }

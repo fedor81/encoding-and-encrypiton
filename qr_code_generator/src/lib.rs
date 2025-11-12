@@ -1,1 +1,1 @@
-mod code128;
+pub mod barcode;
