@@ -5,8 +5,11 @@ mod code_set;
 mod unit;
 
 use characters::{CHARS, CODE_LEN, Encoding};
-use code_set::CodeSet;
 use unit::Unit;
+
+pub use code_set::CodeSet;
+
+use crate::barcode::characters::TERM;
 
 /// # Code 128
 ///
@@ -152,15 +155,14 @@ impl<'a> Code128<'a> {
         for code in data {
             result.extend_from_slice(&code);
         }
+
+        // Добавляем терминальный символ
+        result.extend_from_slice(&TERM);
         result
     }
 
     #[cfg(test)]
     fn convert_to_units(data: &[u8]) -> Vec<Unit> {
-        if data.len() % CODE_LEN != 0 {
-            panic!()
-        }
-
         let mut result = Vec::with_capacity(data.len() / CODE_LEN);
         let mut encoding = [0u8; CODE_LEN];
 
@@ -173,13 +175,18 @@ impl<'a> Code128<'a> {
         result
     }
 
+    /// First unit - is start symbol
     fn checksum(data: &[Unit]) -> Unit {
+        let start_unit = data.first().unwrap().index();
         Unit::from(
-            data.iter()
-                .map(|unit| unit.index())
-                .enumerate()
-                .map(|(position, code_idx)| code_idx * (position + 1))
-                .sum::<usize>()
+            (start_unit
+                + data
+                    .iter()
+                    .skip(1)
+                    .map(|unit| unit.index())
+                    .enumerate()
+                    .map(|(position, code_idx)| code_idx * (position + 1))
+                    .sum::<usize>())
                 % 103,
         )
     }
@@ -211,7 +218,7 @@ mod tests {
         [1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0], // 36
         [1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0], // 37
         [1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0], // 38
-        [1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0], // Checksum = 49
+        [1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0], // Checksum = 42
         [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0]] // STOP
     )]
     #[case("Ɓ0( \\q\u{017B}", vec![
@@ -222,7 +229,7 @@ mod tests {
         [1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0], // 60 - \ 
         [1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0], // 81 - q 
         [1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0], // 96 - \u{017B} 
-        [1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0], // Checksum = 73
+        [1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0], // Checksum = 18
         [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0]] // STOP
     )]
     #[case("Ć4609345677", vec![
@@ -232,7 +239,7 @@ mod tests {
         [1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0], // 34
         [1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0], // 56 
         [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0], // 77
-        [1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0], // Checksum = 72
+        [1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0], // Checksum = 56
         [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0]] // STOP
     )]
     #[case("À\u{0000}\u{017A}Ć6369Ɓl`", vec![ // CodeSet switching
@@ -245,7 +252,7 @@ mod tests {
         [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0], // 100 - Switch B
         [1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0], // 76 - l
         [1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0], // 64 - `
-        [1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0], // Checksum = 29
+        [1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0], // Checksum = 15
         [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0]] // STOP
     )]
     fn code128_encode_payload(#[case] input: &str, #[case] expected: Vec<Encoding>) {
@@ -266,8 +273,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case("À\u{0000}\u{017A}Ć6369Ɓl`", vec![103, 64, 97, 99, 63, 69, 100, 76, 64, 29, 106], None)]
-    #[case("\u{0000}\u{017A}", vec![103, 64, 97, 7, 106], Some(CodeSet::A))]
+    #[case("À\u{0000}\u{017A}Ć6369Ɓl`", vec![103, 64, 97, 99, 63, 69, 100, 76, 64, 15, 106], None)]
+    #[case("\u{0000}\u{017A}", vec![103, 64, 97, 52, 106], Some(CodeSet::A))]
     fn code128_test(
         #[case] input: &str,
         #[case] expected: Vec<usize>,
@@ -286,5 +293,51 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(expected, actual, "start codeset = {:?}", codeset);
+    }
+
+    #[rstest]
+    #[case("ĆŹ4218402050À0", &"110100111001111010111010110111000110011100101100010100011001001110110001011101110101111010011101100101011110001100011101011", None)]
+    #[case("ƁxyZÀ199!*1", &"1101001000011110010010110110111101110110001011101011110100111001101110010110011100101100110011011001100100010010011100110100101111001100011101011", None)]
+    fn code128_test_str(
+        #[case] input: &str,
+        #[case] expected: &str,
+        #[case] codeset: Option<CodeSet>,
+    ) {
+        let actual_vec = if let Some(codeset) = codeset {
+            Code128::encode_with_codeset(input, codeset)
+        } else {
+            Code128::encode(input)
+        }
+        .unwrap();
+
+        assert!(actual_vec.len() > 0);
+
+        let actual_str = actual_vec
+            .iter()
+            .map(|&byte| if byte == 1 { '1' } else { '0' })
+            .collect::<String>();
+
+        let actual_units = Code128::convert_to_units(&actual_vec)
+            .into_iter()
+            .map(|unit| unit.index())
+            .collect::<Vec<_>>();
+
+        let expected_vec = expected
+            .chars()
+            .map(|ch| if ch == '1' { 1 } else { 0 })
+            .collect::<Vec<_>>();
+        let expected_units = Code128::convert_to_units(&expected_vec)
+            .into_iter()
+            .map(|unit| unit.index())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            expected, actual_str,
+            "start codeset = {codeset:?}\n\
+            actual:\t{actual_str}\n\
+            expect:\t{expected}\n\
+            actual_units: {actual_units:?}\n\
+            expect_units: {expected_units:?}",
+        );
     }
 }
