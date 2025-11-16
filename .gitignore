@@ -12,3 +12,7 @@ Thumbs.db
 # Закодированные файлы
 **.huff
 **.extract
+
+# Тестовые файлы
+**/test_draw_barcode_works.png
+**/test_draw_works.png

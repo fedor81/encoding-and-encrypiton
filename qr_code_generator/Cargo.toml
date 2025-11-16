@@ -9,6 +9,7 @@ path = "src/bin/qr_code_generator.rs"
 
 [dependencies]
 anyhow = "1.0.100"
+image = "0.25.9"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
