@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use qr_code_generator::barcode::{Code128, CodeSet};
+use qr_code_generator::barcode::code128::{Code128, CodeSet};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
