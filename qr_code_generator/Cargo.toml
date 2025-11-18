@@ -4,11 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "qr_code_generator"
-path = "src/bin/qr_code_generator.rs"
+name = "generator"
+path = "src/bin/generator.rs"
 
 [dependencies]
 anyhow = "1.0.100"
+clap = { version = "4.5.52", features = ["derive"] }
 image = "0.25.9"
 
 [dev-dependencies]
