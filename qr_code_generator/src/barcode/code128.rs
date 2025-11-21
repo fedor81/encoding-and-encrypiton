@@ -44,7 +44,7 @@ pub use code_set::CodeSet;
 /// # Examples
 ///
 /// ```
-/// use qr_code_generator::barcode::{Code128, CodeSet};
+/// use qr_code_generator::barcode::code128::{Code128, CodeSet};
 ///
 /// Code128::encode("ƁHello World").unwrap();
 /// Code128::encode_with_codeset("Hello World", CodeSet::B).unwrap();
