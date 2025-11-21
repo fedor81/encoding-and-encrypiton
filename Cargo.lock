@@ -918,6 +918,7 @@ dependencies = [
  "clap",
  "image",
  "pretty_assertions",
+ "rand",
  "rstest",
 ]
 
