@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use std::ops::Not;
 
-use crate::utils::convert_to_bits;
+use crate::utils::{add_zeros, bits_to_bytes, bytes_to_bits};
 
 pub struct QRCode {
-    data: Vec<bool>,
+    data: Vec<u8>,
     version: Version,
     corr_level: CorrectionLevel,
     modules: Vec<Vec<Module>>,
@@ -14,26 +14,33 @@ impl QRCode {
     /// Кодирование происходит побайтовым способом, что позволяет кодировать любую последовательность
     /// байт, например UTF-8, но уменьшает плотность данных.
     pub fn build(data: &[u8], corr_level: CorrectionLevel) -> Result<Self> {
-        let payload_len = data.len();
-        let mut data = convert_to_bits(data);
-
-        /// Способ кодирования — поле длиной 4 бита, которое имеет следующие значения:
-        /// - 0001 для цифрового кодирования
-        /// - 0010 для буквенно-цифрового
-        /// - 0100 для побайтового
-        const BYTES_ENCODING: &[bool] = &[false, true, false, false];
-
-        let mut data = Vec::new();
-        data.extend_from_slice(BYTES_ENCODING);
-        data.extend_from_slice(&convert_to_bits(&payload_len.to_le_bytes()));
-
         let version = Version::build(data.len(), corr_level)?;
+        let data = Self::prepare_data(data);
+
         Ok(Self {
             data,
             version,
             corr_level,
             modules: vec![vec![Module::default()]; version.max_len(corr_level)? as usize],
         })
+    }
+
+    /// Способ кодирования — поле длиной 4 бита, которое имеет следующие значения:
+    /// - 0001 для цифрового кодирования
+    /// - 0010 для буквенно-цифрового
+    /// - 0100 для побайтового
+    const BYTES_ENCODING: &[bool] = &[false, true, false, false];
+
+    fn prepare_data(data: &[u8]) -> Vec<u8> {
+        let payload_len = data.len();
+        let mut result = Vec::new();
+
+        result.extend_from_slice(Self::BYTES_ENCODING);
+        result.extend_from_slice(&bytes_to_bits(&payload_len.to_le_bytes()));
+        result.extend_from_slice(&bytes_to_bits(data));
+
+        add_zeros(&mut result); // Дописываем нули в конец до кратности 8
+        bits_to_bytes(&result).expect("The sequence must be a multiple of 8 after add zeros")
     }
 }
 
