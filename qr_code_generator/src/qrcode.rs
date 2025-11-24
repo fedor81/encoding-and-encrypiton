@@ -14,14 +14,15 @@ impl QRCode {
     /// Кодирование происходит побайтовым способом, что позволяет кодировать любую последовательность
     /// байт, например UTF-8, но уменьшает плотность данных.
     pub fn build(data: &[u8], corr_level: CorrectionLevel) -> Result<Self> {
-        let version = Version::build(data.len(), corr_level)?;
-        let data = Self::prepare_data(data);
+        let mut data = Self::add_service_information(data);
+        let version = Version::build(data.len() * 8, corr_level);
+        Self::expand_to_max_size(&mut data, version, corr_level);
 
         Ok(Self {
             data,
             version,
             corr_level,
-            modules: vec![vec![Module::default()]; version.max_len(corr_level)? as usize],
+            modules: vec![vec![Module::default()]; version.max_len(corr_level) as usize],
         })
     }
 
@@ -31,7 +32,7 @@ impl QRCode {
     /// - 0100 для побайтового
     const BYTES_ENCODING: &[bool] = &[false, true, false, false];
 
-    fn prepare_data(data: &[u8]) -> Vec<u8> {
+    fn add_service_information(data: &[u8]) -> Vec<u8> {
         let payload_len = data.len();
         let mut result = Vec::new();
 
@@ -41,6 +42,20 @@ impl QRCode {
 
         add_zeros(&mut result); // Дописываем нули в конец до кратности 8
         bits_to_bytes(&result).expect("The sequence must be a multiple of 8 after add zeros")
+    }
+
+    /// Дополняет данные до максимально возможной длины в версии чередующимися байтами EC и 11
+    fn expand_to_max_size(data: &mut Vec<u8>, version: Version, corr_level: CorrectionLevel) {
+        let mut push_ec = true;
+
+        while data.len() < version.max_len(corr_level) as usize {
+            if push_ec {
+                data.push(0b11101100); // EC
+            } else {
+                data.push(0b00010001); // 11
+            }
+            push_ec = !push_ec;
+        }
     }
 }
 
@@ -92,19 +107,25 @@ impl Version {
         self.0 * 4 + 17
     }
 
-    pub fn max_len(self, corr_level: CorrectionLevel) -> Result<u16> {
+    /// # Panics
+    pub fn build(bits_count: usize, corr_level: CorrectionLevel) -> Self {
+        for version in 1..=40 {
+            if bits_count <= Self::new(version).max_len(corr_level) as usize {
+                return Self::new(version);
+            }
+        }
+        panic!("The version cannot be selected, there is too much data.")
+    }
+
+    pub fn max_len(self, corr_level: CorrectionLevel) -> u16 {
         if 1 <= self.0 && self.0 <= 40 {
-            Ok(DATA_LENGTHS[(self.0 - 1) as usize][corr_level as usize])
+            DATA_LENGTHS[(self.0 - 1) as usize][corr_level as usize]
         } else {
-            anyhow::bail!(
+            panic!(
                 "Invalid version: {}. Version must be in range [1, 40]",
                 self.0
             )
         }
-    }
-
-    pub fn build(data_len: usize, corr_level: CorrectionLevel) -> Result<Self> {
-        todo!()
     }
 }
 
