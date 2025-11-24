@@ -2,6 +2,9 @@ use anyhow::{Context, Result};
 use std::ops::Not;
 
 use crate::utils::{add_zeros, bits_to_bytes, bytes_to_bits};
+use tables::DATA_LENGTHS;
+
+mod tables;
 
 pub struct QRCode {
     data: Vec<u8>,
@@ -22,7 +25,7 @@ impl QRCode {
             data,
             version,
             corr_level,
-            modules: vec![vec![Module::default()]; version.max_len(corr_level) as usize],
+            modules: vec![vec![Module::default()]; version.max_data_len(corr_level)],
         })
     }
 
@@ -48,7 +51,7 @@ impl QRCode {
     fn expand_to_max_size(data: &mut Vec<u8>, version: Version, corr_level: CorrectionLevel) {
         let mut push_ec = true;
 
-        while data.len() < version.max_len(corr_level) as usize {
+        while data.len() < version.max_data_len(corr_level) {
             if push_ec {
                 data.push(0b11101100); // EC
             } else {
@@ -92,7 +95,7 @@ impl Not for Module {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Version(u8);
+pub struct Version(u8);
 
 impl Version {
     /// # Panics
@@ -102,73 +105,42 @@ impl Version {
         Self(version)
     }
 
-    /// Количество моделей QR-кода
+    /// Количество модулей QR-кода
     pub const fn size(self) -> u8 {
         self.0 * 4 + 17
     }
 
     /// # Panics
-    pub fn build(bits_count: usize, corr_level: CorrectionLevel) -> Self {
+    fn build(bits_count: usize, corr_level: CorrectionLevel) -> Self {
         for version in 1..=40 {
-            if bits_count <= Self::new(version).max_len(corr_level) as usize {
+            if bits_count <= Self::new(version).max_data_len(corr_level) {
                 return Self::new(version);
             }
         }
         panic!("The version cannot be selected, there is too much data.")
     }
 
-    pub fn max_len(self, corr_level: CorrectionLevel) -> u16 {
-        if 1 <= self.0 && self.0 <= 40 {
-            DATA_LENGTHS[(self.0 - 1) as usize][corr_level as usize]
-        } else {
-            panic!(
-                "Invalid version: {}. Version must be in range [1, 40]",
-                self.0
-            )
-        }
+    pub fn max_data_len(self, corr_level: CorrectionLevel) -> usize {
+        fetch(self, corr_level, &DATA_LENGTHS).unwrap() as usize
     }
 }
 
-// This table is copied from https://github.com/kennytm/qrcode-rust
-const DATA_LENGTHS: [[u16; 4]; 40] = [
-    [152, 128, 104, 72],
-    [272, 224, 176, 128],
-    [440, 352, 272, 208],
-    [640, 512, 384, 288],
-    [864, 688, 496, 368],
-    [1088, 864, 608, 480],
-    [1248, 992, 704, 528],
-    [1552, 1232, 880, 688],
-    [1856, 1456, 1056, 800],
-    [2192, 1728, 1232, 976],
-    [2592, 2032, 1440, 1120],
-    [2960, 2320, 1648, 1264],
-    [3424, 2672, 1952, 1440],
-    [3688, 2920, 2088, 1576],
-    [4184, 3320, 2360, 1784],
-    [4712, 3624, 2600, 2024],
-    [5176, 4056, 2936, 2264],
-    [5768, 4504, 3176, 2504],
-    [6360, 5016, 3560, 2728],
-    [6888, 5352, 3880, 3080],
-    [7456, 5712, 4096, 3248],
-    [8048, 6256, 4544, 3536],
-    [8752, 6880, 4912, 3712],
-    [9392, 7312, 5312, 4112],
-    [10208, 8000, 5744, 4304],
-    [10960, 8496, 6032, 4768],
-    [11744, 9024, 6464, 5024],
-    [12248, 9544, 6968, 5288],
-    [13048, 10136, 7288, 5608],
-    [13880, 10984, 7880, 5960],
-    [14744, 11640, 8264, 6344],
-    [15640, 12328, 8920, 6760],
-    [16568, 13048, 9368, 7208],
-    [17528, 13800, 9848, 7688],
-    [18448, 14496, 10288, 7888],
-    [19472, 15312, 10832, 8432],
-    [20528, 15936, 11408, 8768],
-    [21616, 16816, 12016, 9136],
-    [22496, 17728, 12656, 9776],
-    [23648, 18672, 13328, 10208],
-];
+impl CorrectionLevel {
+    pub fn max_data_len(self, version: Version) -> usize {
+        fetch(version, self, &DATA_LENGTHS).unwrap() as usize
+    }
+}
+
+/// Obtains an object from a hard-coded table.
+///
+/// The table must be a 40×4 array. The outer array represents the content for each version.
+/// The inner array represents the content in each error correction level, in the order [L, M, Q, H].
+fn fetch<T>(version: Version, corr_level: CorrectionLevel, table: &[[T; 4]; 40]) -> Result<T>
+where
+    T: PartialEq + Default + Copy,
+{
+    if 1 <= version.0 && version.0 <= 40 {
+        return Ok(table[(version.0 - 1) as usize][corr_level as usize]);
+    }
+    anyhow::bail!("Invalid version: {}. Version must be in range [1, 40]", version.0)
+}
