@@ -1,7 +1,15 @@
 use anyhow::{Context, Result};
+use reed_solomon::{
+    self, Coder, ReedSolomon,
+    gf::{FastGF256, GF256},
+    new_reed_solomon,
+};
 use std::ops::Not;
 
-use crate::utils::{add_zeros, bits_to_bytes, bytes_to_bits};
+use crate::{
+    qrcode::tables::EC_BYTES_PER_BLOCK,
+    utils::{add_zeros, bits_to_bytes, bytes_to_bits},
+};
 use tables::{DATA_BYTES_PER_BLOCK, DATA_LENGTHS};
 
 mod tables;
@@ -16,11 +24,12 @@ pub struct QRCode {
 impl QRCode {
     /// Кодирование происходит побайтовым способом, что позволяет кодировать любую последовательность
     /// байт, например UTF-8, но уменьшает плотность данных.
-    pub fn build(data: &[u8], corr_level: CorrectionLevel) -> Result<Self> {
+    pub fn build<T: ReedSolomonEncoder>(data: &[u8], corr_level: CorrectionLevel) -> Result<Self> {
         let mut data = Self::add_service_information(data);
         let version = Version::build(data.len() * 8, corr_level);
         Self::expand_to_max_size(&mut data, version, corr_level);
-        let blocks = BlocksInfo::split_into_blocks(&data, version, corr_level)?;
+        let mut blocks = BlocksInfo::split_into_blocks(&data, version, corr_level)?;
+        Self::apply_reed_solomon::<T>(&mut blocks, version, corr_level)?;
 
         Ok(Self {
             data,
@@ -28,6 +37,15 @@ impl QRCode {
             corr_level,
             modules: vec![vec![Module::default()]; version.max_data_len(corr_level)],
         })
+    }
+
+    fn apply_reed_solomon<T: ReedSolomonEncoder>(
+        blocks: &mut [Block],
+        version: Version,
+        corr_level: CorrectionLevel,
+    ) -> Result<()> {
+        let reed_solomon = T::new(version, corr_level)?;
+        reed_solomon.apply_for_blocks(blocks)
     }
 
     /// Способ кодирования — поле длиной 4 бита, которое имеет следующие значения:
@@ -107,6 +125,46 @@ struct BlocksInfo {
     count: u8,
 }
 
+pub trait ReedSolomonEncoder
+where
+    Self: Sized,
+{
+    fn apply(&self, data: &[u8]) -> Result<Vec<u8>>;
+    fn new(version: Version, corr_level: CorrectionLevel) -> Result<Self>;
+
+    fn apply_for_blocks(&self, blocks: &mut [Block]) -> Result<()> {
+        for block in blocks {
+            block.apply_reed_solomon(self)?;
+        }
+        Ok(())
+    }
+}
+
+impl ReedSolomonEncoder for ReedSolomon<FastGF256> {
+    fn apply(&self, data: &[u8]) -> Result<Vec<u8>> {
+        self.encode(data)
+    }
+
+    fn new(version: Version, corr_level: CorrectionLevel) -> Result<Self> {
+        let control_count = EC_BYTES_PER_BLOCK
+            .get(version.0 as usize - 1)
+            .and_then(|bytes_per_level| bytes_per_level.get(corr_level.index()).copied())
+            .ok_or(anyhow::format_err!(
+                "Index out of range. Invalid QR version: {} or correction level index: {}",
+                version.0,
+                corr_level.index()
+            ))? as usize;
+        Ok(new_reed_solomon(control_count))
+    }
+}
+
+impl Block {
+    pub fn apply_reed_solomon<T: ReedSolomonEncoder>(&mut self, reed_solomon: &T) -> Result<()> {
+        self.data = reed_solomon.apply(&self.data)?;
+        Ok(())
+    }
+}
+
 impl From<Vec<u8>> for Block {
     fn from(value: Vec<u8>) -> Self {
         Self { data: value }
@@ -145,17 +203,16 @@ impl BlocksInfo {
     pub fn split_into_blocks(data: &[u8], version: Version, corr_level: CorrectionLevel) -> Result<Vec<Block>> {
         let (info1, info2) = BlocksInfo::fetch(version, corr_level)?;
 
-        if data.len() != info1.count() * info1.size() + info2.count() * info2.size() {
-            anyhow::bail!(
-                "The data length does not match the number of blocks and block sizes:\
-                {} != ({} * {}) + ({} * {})",
-                data.len(),
-                info1.count(),
-                info1.size(),
-                info2.count(),
-                info2.size()
-            );
-        }
+        anyhow::ensure!(
+            data.len() != info1.count() * info1.size() + info2.count() * info2.size(),
+            "The data length does not match the number of blocks and block sizes:\
+            {} != ({} * {}) + ({} * {})",
+            data.len(),
+            info1.count(),
+            info1.size(),
+            info2.count(),
+            info2.size()
+        );
 
         let (part1, part2) = data.split_at(info1.size() * info1.count());
 
@@ -209,6 +266,19 @@ impl Version {
 impl CorrectionLevel {
     pub fn max_data_len(self, version: Version) -> usize {
         fetch(version, self, &DATA_LENGTHS).unwrap() as usize
+    }
+
+    /// Returns the index of the current level in the table.
+    ///
+    /// # Returns
+    /// L – 0, M – 1, Q – 2, H – 3
+    pub fn index(self) -> usize {
+        match self {
+            Self::L => 0,
+            Self::M => 1,
+            Self::Q => 2,
+            Self::H => 3,
+        }
     }
 }
 
