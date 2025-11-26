@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::ops::Not;
 
 use crate::utils::{add_zeros, bits_to_bytes, bytes_to_bits};
-use tables::DATA_LENGTHS;
+use tables::{DATA_BYTES_PER_BLOCK, DATA_LENGTHS};
 
 mod tables;
 
@@ -20,6 +20,7 @@ impl QRCode {
         let mut data = Self::add_service_information(data);
         let version = Version::build(data.len() * 8, corr_level);
         Self::expand_to_max_size(&mut data, version, corr_level);
+        let blocks = BlocksInfo::split_into_blocks(&data, version, corr_level)?;
 
         Ok(Self {
             data,
@@ -35,6 +36,7 @@ impl QRCode {
     /// - 0100 для побайтового
     const BYTES_ENCODING: &[bool] = &[false, true, false, false];
 
+    /// Добавляет способ кдирования и длину данных
     fn add_service_information(data: &[u8]) -> Vec<u8> {
         let payload_len = data.len();
         let mut result = Vec::new();
@@ -91,6 +93,85 @@ impl Not for Module {
             Self::Dark => Self::Light,
             Self::Unused => panic!("Unused module cannot be inverted"),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Block {
+    data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BlocksInfo {
+    size: u8,
+    count: u8,
+}
+
+impl From<Vec<u8>> for Block {
+    fn from(value: Vec<u8>) -> Self {
+        Self { data: value }
+    }
+}
+
+impl From<&[u8]> for Block {
+    fn from(value: &[u8]) -> Self {
+        Self { data: value.to_vec() }
+    }
+}
+
+impl BlocksInfo {
+    pub fn fetch(version: Version, corr_level: CorrectionLevel) -> Result<(Self, Self)> {
+        let (size1, count1, size2, count2) = fetch(version, corr_level, &DATA_BYTES_PER_BLOCK)?;
+        Ok((
+            Self {
+                size: size1,
+                count: count1,
+            },
+            Self {
+                size: size2,
+                count: count2,
+            },
+        ))
+    }
+
+    pub fn size(self) -> usize {
+        self.size as usize
+    }
+
+    pub fn count(self) -> usize {
+        self.count as usize
+    }
+
+    pub fn split_into_blocks(data: &[u8], version: Version, corr_level: CorrectionLevel) -> Result<Vec<Block>> {
+        let (info1, info2) = BlocksInfo::fetch(version, corr_level)?;
+
+        if data.len() != info1.count() * info1.size() + info2.count() * info2.size() {
+            anyhow::bail!(
+                "The data length does not match the number of blocks and block sizes:\
+                {} != ({} * {}) + ({} * {})",
+                data.len(),
+                info1.count(),
+                info1.size(),
+                info2.count(),
+                info2.size()
+            );
+        }
+
+        let (part1, part2) = data.split_at(info1.size() * info1.count());
+
+        // TODO: Можно заранее выделить необходимое количество памяти
+
+        let mut blocks = part1
+            .chunks(info1.size())
+            .map(|chunk| Block::from(chunk.to_vec()))
+            .collect::<Vec<_>>();
+
+        // Некоторые версии QR-кода имеют блоки разного размера
+        if part2.len() > 0 {
+            blocks.extend(part2.chunks(info2.size()).map(|chunk| Block::from(chunk.to_vec())));
+        }
+
+        Ok(blocks)
     }
 }
 
