@@ -1,3 +1,21 @@
+use anyhow::Result;
+
+use super::{CorrectionLevel, Version};
+
+/// Obtains an object from a hard-coded table.
+///
+/// The table must be a 40×4 array. The outer array represents the content for each version.
+/// The inner array represents the content in each error correction level, in the order [L, M, Q, H].
+pub fn fetch<T>(version: Version, corr_level: CorrectionLevel, table: &[[T; 4]; 40]) -> Result<T>
+where
+    T: PartialEq + Default + Copy,
+{
+    if 1 <= version.num() && version.num() <= 40 {
+        return Ok(table[(version.num() - 1) as usize][corr_level as usize]);
+    }
+    anyhow::bail!("Invalid version: {}. Version must be in range [1, 40]", version.num())
+}
+
 /// This table is copied from https://github.com/kennytm/qrcode-rust
 pub const DATA_LENGTHS: [[u16; 4]; 40] = [
     [152, 128, 104, 72],
