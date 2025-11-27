@@ -18,8 +18,17 @@ pub struct BlocksInfo {
 
 impl Block {
     pub fn apply_reed_solomon<T: ReedSolomonEncoder>(&mut self, reed_solomon: &T) -> Result<()> {
+        // FIXME: Контрольная сумма должна находиться в конце блока
         self.data = reed_solomon.apply(&self.data)?;
         Ok(())
+    }
+
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.data
     }
 }
 
