@@ -48,6 +48,11 @@ impl QRCode {
         })
     }
 
+    pub fn build_with_default_encoder(data: &[u8], corr_level: CorrectionLevel) -> Result<Self> {
+        Self::build::<reed_solomon::ReedSolomon<reed_solomon::gf::FastGF256>>(data, corr_level)
+            .with_context(|| "Failed to build QR code with default encoder")
+    }
+
     /// У нас имеется несколько блоков данных и столько же блоков байтов коррекции,
     /// их надо объединить в один поток байт. Делается это следующим образом:
     /// из каждого блока данных по очереди берётся один байт информации, когда очередь
