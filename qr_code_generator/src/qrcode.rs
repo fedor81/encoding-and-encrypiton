@@ -1,7 +1,10 @@
 use anyhow::{Context, Result};
-use rand::rand_core::block;
+use image::{ImageBuffer, Luma};
 
-use crate::utils::{add_zeros, bits_to_bytes, bytes_to_bits};
+use crate::{
+    Drawable,
+    utils::{add_zeros, bits_to_bytes, bytes_to_bits},
+};
 
 mod blocks;
 mod rs_encoder;
@@ -16,7 +19,7 @@ pub struct QRCode {
     data: Vec<u8>,
     version: Version,
     corr_level: CorrectionLevel,
-    modules: Vec<Vec<Module>>,
+    modules: Option<Vec<Vec<Module>>>,
 }
 
 impl QRCode {
@@ -41,7 +44,7 @@ impl QRCode {
             data,
             version,
             corr_level,
-            modules: vec![vec![Module::default()]; version.max_data_len(corr_level)],
+            modules: None,
         })
     }
 
@@ -106,5 +109,31 @@ impl QRCode {
             }
             push_ec = !push_ec;
         }
+    }
+
+    fn modules(&self) -> &[Vec<Module>] {
+        if let Some(modules) = &self.modules {
+            return modules;
+        }
+        todo!()
+    }
+}
+
+impl Drawable for QRCode {
+    fn draw<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
+        let modules = self.modules();
+        let size = modules.len();
+
+        let mut img = ImageBuffer::<Luma<u8>, Vec<u8>>::new(size as u32, size as u32);
+
+        for x in 0..size {
+            for y in 0..size {
+                let color = if modules[x][y].is_dark() { 255 } else { 0 };
+                img.put_pixel(x as u32, y as u32, Luma([color]));
+            }
+        }
+
+        img.save(path)?;
+        Ok(())
     }
 }

@@ -34,6 +34,20 @@ impl Not for Module {
     }
 }
 
+impl Module {
+    pub fn is_dark(self) -> bool {
+        self == Self::Dark
+    }
+
+    pub fn is_light(self) -> bool {
+        self == Self::Light
+    }
+
+    pub fn is_unused(self) -> bool {
+        self == Self::Unused
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Version(u8);
 
