@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use rand::rand_core::block;
 
 use crate::utils::{add_zeros, bits_to_bytes, bytes_to_bits};
 
@@ -24,9 +25,17 @@ impl QRCode {
     pub fn build<T: ReedSolomonEncoder>(data: &[u8], corr_level: CorrectionLevel) -> Result<Self> {
         let mut data = Self::add_service_information(data);
         let version = Version::build(data.len() * 8, corr_level);
+
         Self::expand_to_max_size(&mut data, version, corr_level);
+
+        // Разбиваем данные на блоки
         let mut blocks = BlocksInfo::split_into_blocks(&data, version, corr_level)?;
+
+        // Применяем кодирование
         Self::apply_reed_solomon::<T>(&mut blocks, version, corr_level)?;
+
+        // Объединяем блоки
+        data = Self::combine_blocks(&blocks);
 
         Ok(Self {
             data,
@@ -34,6 +43,27 @@ impl QRCode {
             corr_level,
             modules: vec![vec![Module::default()]; version.max_data_len(corr_level)],
         })
+    }
+
+    /// У нас имеется несколько блоков данных и столько же блоков байтов коррекции,
+    /// их надо объединить в один поток байт. Делается это следующим образом:
+    /// из каждого блока данных по очереди берётся один байт информации, когда очередь
+    /// доходит до последнего блока, из него берётся байт и очередь переходит к первому блоку.
+    /// Так продолжается до тех пор, пока в каждом блоке не кончатся байты.
+    /// Если в текущем блоке уже нет байт, то он пропускается.
+    fn combine_blocks(blocks: &[Block]) -> Vec<u8> {
+        let mut result = Vec::with_capacity(blocks.len() * blocks.get(0).expect("blocks slice is empty").len());
+
+        // TODO: Можно попробовать избежать лишнего копирования
+        for i in 0..blocks.len() {
+            for block in blocks {
+                if let Some(&byte) = block.as_slice().get(i) {
+                    result.push(byte);
+                }
+            }
+        }
+
+        result
     }
 
     fn apply_reed_solomon<T: ReedSolomonEncoder>(
