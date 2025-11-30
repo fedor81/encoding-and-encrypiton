@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Ok, Result};
 use image::{ImageBuffer, Luma};
 
 use crate::{
@@ -13,13 +13,14 @@ mod types;
 
 pub(self) use blocks::{Block, BlocksInfo};
 pub(self) use rs_encoder::ReedSolomonEncoder;
+pub(self) use types::Canvas;
 pub use types::{CorrectionLevel, Module, Version};
 
 pub struct QRCode {
     data: Vec<u8>,
     version: Version,
     corr_level: CorrectionLevel,
-    modules: Option<Vec<Vec<Module>>>,
+    modules: Canvas,
 }
 
 impl QRCode {
@@ -32,19 +33,22 @@ impl QRCode {
         Self::expand_to_max_size(&mut data, version, corr_level);
 
         // Разбиваем данные на блоки
-        let mut blocks = BlocksInfo::split_into_blocks(&data, version, corr_level)?;
+        let mut blocks = BlocksInfo::split_into_blocks(&data, version, corr_level).context("split data into blocks")?;
 
         // Применяем кодирование
-        Self::apply_reed_solomon::<T>(&mut blocks, version, corr_level)?;
+        Self::apply_reed_solomon::<T>(&mut blocks, version, corr_level)
+            .context("apply Reed-Solomon error correction")?;
 
         // Объединяем блоки
         data = Self::combine_blocks(&blocks);
+
+        let modules = Self::build_modules(&data, corr_level, version).context("build QR code modules (canvas)")?;
 
         Ok(Self {
             data,
             version,
             corr_level,
-            modules: None,
+            modules,
         })
     }
 
@@ -116,24 +120,60 @@ impl QRCode {
         }
     }
 
-    fn modules(&self) -> &[Vec<Module>] {
-        if let Some(modules) = &self.modules {
-            return modules;
+    fn build_modules(data: &[u8], corr_level: CorrectionLevel, version: Version) -> Result<Canvas> {
+        let size = version.size();
+        let mut modules = vec![vec![Module::default(); size]; size];
+
+        Self::add_finder_patterns(&mut modules)?;
+        Ok(modules)
+    }
+
+    fn add_finder_patterns(modules: &mut Canvas) -> Result<()> {
+        let size = modules.len();
+
+        if size < 7 {
+            anyhow::bail!("QR code size is too small to fit finder patterns (size < 7)");
         }
-        todo!()
+
+        // Верхний левый
+        Self::add_finder_pattern(modules, 0, 0).context("failed to add top-left finder pattern")?;
+
+        // Верхний правый
+        Self::add_finder_pattern(modules, size - 7, 0).context("failed to add top-right finder pattern")?;
+
+        // Нижний левый
+        Self::add_finder_pattern(modules, 0, size - 7).context("failed to add bottom-left finder pattern")?;
+
+        Ok(())
+    }
+
+    /// Добавляет чёрный квадрат размером 3 на 3 модуля, который окружён рамкой из белых модулей,
+    /// которая окружена рамкой из чёрных модулей, которая окружена рамкой из белых модулей
+    /// только с тех сторон, где нет отступа.
+    fn add_finder_pattern(modules: &mut Canvas, x: usize, y: usize) -> Result<()> {
+        for i in 0..7 {
+            for j in 0..7 {
+                modules[y + j][x + i].try_set_with(|| {
+                    if i == 0 || i == 6 || j == 0 || j == 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4) {
+                        Module::Dark
+                    } else {
+                        Module::Light
+                    }
+                })?;
+            }
+        }
+        Ok(())
     }
 }
 
 impl Drawable for QRCode {
     fn draw<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
-        let modules = self.modules();
-        let size = modules.len();
-
+        let size = self.modules.len();
         let mut img = ImageBuffer::<Luma<u8>, Vec<u8>>::new(size as u32, size as u32);
 
         for x in 0..size {
             for y in 0..size {
-                let color = if modules[x][y].is_dark() { 255 } else { 0 };
+                let color = if self.modules[x][y].is_dark() { 0 } else { 255 };
                 img.put_pixel(x as u32, y as u32, Luma([color]));
             }
         }

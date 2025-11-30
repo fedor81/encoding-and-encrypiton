@@ -1,6 +1,10 @@
+use anyhow::Result;
 use std::ops::Not;
 
 use super::tables::{DATA_LENGTHS, fetch};
+
+/// QR код в виде матрицы модулей
+pub type Canvas = Vec<Vec<Module>>;
 
 /// QR коды разных уровней коррекции
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -46,6 +50,23 @@ impl Module {
     pub fn is_unused(self) -> bool {
         self == Self::Unused
     }
+
+    /// Устанавливает значение модуля, если он Unused, иначе ошибка
+    pub fn try_set(&mut self, module: Module) -> Result<()> {
+        self.try_set_with(|| module)
+    }
+
+    /// Устанавливает значение модуля, возвращаемой функцией. НО если модуль не Unused - ошибка
+    pub fn try_set_with<F>(&mut self, f: F) -> Result<()>
+    where
+        F: FnOnce() -> Module,
+    {
+        if !self.is_unused() {
+            anyhow::bail!("Cannot replace a non-unused module with another module");
+        }
+        *self = f();
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -60,8 +81,8 @@ impl Version {
     }
 
     /// Количество модулей QR-кода
-    pub const fn size(self) -> u8 {
-        self.0 * 4 + 17
+    pub const fn size(self) -> usize {
+        self.0 as usize * 4 + 17
     }
 
     /// # Panics
