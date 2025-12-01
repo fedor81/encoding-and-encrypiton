@@ -124,8 +124,16 @@ impl QRCode {
         let size = version.size();
         let mut modules = vec![vec![Module::default(); size]; size];
 
-        Self::add_finder_patterns(&mut modules)?;
+        Self::add_patterns(&mut modules);
+
         Ok(modules)
+    }
+
+    fn add_patterns(modules: &mut Canvas) -> Result<()> {
+        Self::add_finder_patterns(modules)?;
+        Self::add_separators(modules).context("add separators")?;
+        Self::add_timing_patterns(modules)?;
+        Ok(())
     }
 
     fn add_finder_patterns(modules: &mut Canvas) -> Result<()> {
@@ -153,14 +161,50 @@ impl QRCode {
     fn add_finder_pattern(modules: &mut Canvas, x: usize, y: usize) -> Result<()> {
         for i in 0..7 {
             for j in 0..7 {
-                modules[y + j][x + i].try_set_with(|| {
+                modules[y + j][x + i].try_set(
                     if i == 0 || i == 6 || j == 0 || j == 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4) {
                         Module::Dark
                     } else {
                         Module::Light
-                    }
-                })?;
+                    },
+                )?;
             }
+        }
+        Ok(())
+    }
+
+    fn add_separators(modules: &mut Canvas) -> Result<()> {
+        let size = modules.len();
+
+        for i in 0..8 {
+            if i < 7 {
+                modules[7][i].try_set(Module::Light)?; // справа
+                modules[i][7].try_set(Module::Light)?; // снизу
+            }
+            modules[7][size - 8].try_set(Module::Light)?; // слева от верхнего правого
+            modules[size - 8][7].try_set(Module::Light)?; // сверху от нижнего левого
+        }
+        Ok(())
+    }
+
+    /// Добавляет полосы синхронизации. Полосы начинаются от самого нижнего правого чёрного
+    /// модуля верхнего левого поискового узора и идут, чередуя чёрные и белые модули,
+    /// вниз и вправо до противоположных поисковых узоров.
+    fn add_timing_patterns(modules: &mut Canvas) -> Result<()> {
+        let size = modules.len();
+
+        // Горизонтальный тайминг
+        for i in 8..size - 8 {
+            modules[6][i]
+                .try_set(if i % 2 == 0 { Module::Dark } else { Module::Light })
+                .context("set horizontal timing")?;
+        }
+
+        // Вертикальный тайминг
+        for i in 8..size - 8 {
+            modules[i][6]
+                .try_set(if i % 2 == 0 { Module::Dark } else { Module::Light })
+                .context("set vertical timing")?;
         }
         Ok(())
     }
