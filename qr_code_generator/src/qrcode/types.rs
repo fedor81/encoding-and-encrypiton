@@ -136,3 +136,82 @@ impl CorrectionLevel {
         }
     }
 }
+
+// Mask patterns and functions was copied from https://github.com/kennytm/qrcode-rust,
+// but i16 was replaced with u16.
+
+/// The mask patterns. Since QR code and Micro QR code do not use the same
+/// pattern number, we name them according to their shape instead of the number.
+#[derive(Debug, Copy, Clone, Default)]
+pub enum MaskPattern {
+    /// QR code pattern 000: `(x + y) % 2 == 0`.
+    #[default]
+    Checkerboard = 0b000,
+
+    /// QR code pattern 001: `y % 2 == 0`.
+    HorizontalLines = 0b001,
+
+    /// QR code pattern 010: `x % 3 == 0`.
+    VerticalLines = 0b010,
+
+    /// QR code pattern 011: `(x + y) % 3 == 0`.
+    DiagonalLines = 0b011,
+
+    /// QR code pattern 100: `((x/3) + (y/2)) % 2 == 0`.
+    LargeCheckerboard = 0b100,
+
+    /// QR code pattern 101: `(x*y)%2 + (x*y)%3 == 0`.
+    Fields = 0b101,
+
+    /// QR code pattern 110: `((x*y)%2 + (x*y)%3) % 2 == 0`.
+    Diamonds = 0b110,
+
+    /// QR code pattern 111: `((x+y)%2 + (x*y)%3) % 2 == 0`.
+    Meadow = 0b111,
+}
+
+mod mask_functions {
+    pub const fn checkerboard(x: u16, y: u16) -> bool {
+        (x + y) % 2 == 0
+    }
+    pub const fn horizontal_lines(_: u16, y: u16) -> bool {
+        y % 2 == 0
+    }
+    pub const fn vertical_lines(x: u16, _: u16) -> bool {
+        x % 3 == 0
+    }
+    pub const fn diagonal_lines(x: u16, y: u16) -> bool {
+        (x + y) % 3 == 0
+    }
+    pub const fn large_checkerboard(x: u16, y: u16) -> bool {
+        ((y / 2) + (x / 3)) % 2 == 0
+    }
+    pub const fn fields(x: u16, y: u16) -> bool {
+        (x * y) % 2 + (x * y) % 3 == 0
+    }
+    pub const fn diamonds(x: u16, y: u16) -> bool {
+        ((x * y) % 2 + (x * y) % 3) % 2 == 0
+    }
+    pub const fn meadow(x: u16, y: u16) -> bool {
+        ((x + y) % 2 + (x * y) % 3) % 2 == 0
+    }
+}
+
+impl MaskPattern {
+    pub fn get_function(self) -> fn(u16, u16) -> bool {
+        match self {
+            MaskPattern::Checkerboard => mask_functions::checkerboard,
+            MaskPattern::HorizontalLines => mask_functions::horizontal_lines,
+            MaskPattern::VerticalLines => mask_functions::vertical_lines,
+            MaskPattern::DiagonalLines => mask_functions::diagonal_lines,
+            MaskPattern::LargeCheckerboard => mask_functions::large_checkerboard,
+            MaskPattern::Fields => mask_functions::fields,
+            MaskPattern::Diamonds => mask_functions::diamonds,
+            MaskPattern::Meadow => mask_functions::meadow,
+        }
+    }
+
+    pub fn apply(self, x: u16, y: u16) -> bool {
+        Self::get_function(self)(x, y)
+    }
+}
