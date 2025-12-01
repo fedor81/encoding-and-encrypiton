@@ -1,6 +1,8 @@
 use anyhow::Result;
 use std::ops::Not;
 
+use crate::qrcode::tables;
+
 use super::tables::{DATA_LENGTHS, fetch};
 
 /// QR код в виде матрицы модулей
@@ -102,6 +104,13 @@ impl Version {
     /// Возвращает номер версии
     pub fn num(self) -> usize {
         self.0 as usize
+    }
+
+    pub fn get_alignment_positions(self) -> &'static [u8] {
+        match self.0 {
+            1..=40 => tables::ALIGNMENT_PATTERN_POSITIONS[self.0 as usize],
+            _ => unreachable!(),
+        }
     }
 }
 

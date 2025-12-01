@@ -124,15 +124,16 @@ impl QRCode {
         let size = version.size();
         let mut modules = vec![vec![Module::default(); size]; size];
 
-        Self::add_patterns(&mut modules);
+        Self::add_patterns(&mut modules, version)?;
 
         Ok(modules)
     }
 
-    fn add_patterns(modules: &mut Canvas) -> Result<()> {
+    fn add_patterns(modules: &mut Canvas, version: Version) -> Result<()> {
         Self::add_finder_patterns(modules)?;
         Self::add_separators(modules).context("add separators")?;
         Self::add_timing_patterns(modules)?;
+        Self::add_alignment_patterns(modules, version)?;
         Ok(())
     }
 
@@ -205,6 +206,57 @@ impl QRCode {
             modules[i][6]
                 .try_set(if i % 2 == 0 { Module::Dark } else { Module::Light })
                 .context("set vertical timing")?;
+        }
+        Ok(())
+    }
+
+    /// Добавляет выравнивающие узоры (alignment patterns).
+    /// Пропускает позиции, где находятся finder patterns.
+    fn add_alignment_patterns(modules: &mut Canvas, version: Version) -> Result<()> {
+        let size = modules.len();
+        let positions = version.get_alignment_positions();
+
+        for x in positions.iter().map(|n| *n as usize) {
+            for y in positions.iter().map(|n| *n as usize) {
+                // Пропускаем позиции с finder patterns
+                if !((x < 9 && y < 9) || (x > size - 10 && y < 9) || (x < 9 && y > size - 10)) {
+                    Self::add_single_alignment_pattern(modules, x, y)
+                        .with_context(|| format!("failed to add alignment pattern at ({}, {})", x, y))?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Добавляет один выравнивающий узор 5×5 с центром в (x, y).
+    /// Требует, чтобы координаты (x, y) были ≥ 2 и ≤ size - 3, чтобы шаблон вмещался.
+    fn add_single_alignment_pattern(modules: &mut Canvas, x: usize, y: usize) -> Result<()> {
+        // Проверим, что шаблон поместится
+        let size = modules.len();
+        if x < 2 || x >= size - 2 || y < 2 || y >= size - 2 {
+            anyhow::bail!(
+                "alignment pattern at ({}, {}) is too close to the edge and would go out of bounds",
+                x,
+                y
+            );
+        }
+
+        for i in 0..5 {
+            for j in 0..5 {
+                modules[y - 2 + j][x - 2 + i]
+                    .try_set(if i == 0 || i == 4 || j == 0 || j == 4 || (i == 2 && j == 2) {
+                        Module::Dark
+                    } else {
+                        Module::Light
+                    })
+                    .with_context(|| {
+                        format!(
+                            "failed to set module at ({}, {}) while adding alignment pattern centered at ({x}, {y})",
+                            x - 2 + i,
+                            y - 2 + j,
+                        )
+                    })?;
+            }
         }
         Ok(())
     }
