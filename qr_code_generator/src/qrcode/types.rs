@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::ops::Not;
 
-use crate::qrcode::tables;
+use crate::{qrcode::tables, utils};
 
 use super::tables::{DATA_LENGTHS, fetch};
 
@@ -111,6 +111,10 @@ impl Version {
             1..=40 => tables::ALIGNMENT_PATTERN_POSITIONS[self.0 as usize],
             _ => unreachable!(),
         }
+    }
+
+    pub fn get_version_info_bits(self) -> Vec<bool> {
+        utils::byte_to_bits(self.0)
     }
 }
 

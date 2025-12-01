@@ -17,10 +17,7 @@ where
 
 pub fn bits_to_bytes(bits: &[bool]) -> Result<Vec<u8>> {
     if bits.len() % 8 != 0 {
-        anyhow::bail!(
-            "Invalid length, must be a multiple of 8, current: {}",
-            bits.len()
-        )
+        anyhow::bail!("Invalid length, must be a multiple of 8, current: {}", bits.len())
     }
     Ok(bits
         .chunks(8)
@@ -37,7 +34,7 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
     result
 }
 
-fn byte_to_bits(byte: u8) -> Vec<bool> {
+pub fn byte_to_bits(byte: u8) -> Vec<bool> {
     let mut result = Vec::with_capacity(8);
     for bit in (0..8).rev() {
         if byte & (1 << bit) != 0 {
@@ -73,17 +70,8 @@ mod tests {
     #[case("11111111", 255)]
     #[case("10000000", 128)]
     fn test_bits_to_number(#[case] input: &str, #[case] expected: u8) {
-        let bits = input
-            .chars()
-            .into_iter()
-            .map(|ch| ch == '1')
-            .collect::<Vec<_>>();
-        assert_eq!(
-            bits_to_number::<u8>(&bits),
-            expected,
-            "Failed for input: {:?}",
-            bits
-        );
+        let bits = input.chars().into_iter().map(|ch| ch == '1').collect::<Vec<_>>();
+        assert_eq!(bits_to_number::<u8>(&bits), expected, "Failed for input: {:?}", bits);
     }
 
     #[test]
@@ -118,10 +106,7 @@ mod tests {
     fn test_bits_to_bytes(#[case] mut input: String, #[case] expected: Vec<u8>) {
         input = input.replace('_', "");
         let bits = input.chars().map(|c| c == '1').collect::<Vec<_>>();
-        assert!(
-            bits.len() % 8 == 0,
-            "The input sequence must be a multiple of 8."
-        );
+        assert!(bits.len() % 8 == 0, "The input sequence must be a multiple of 8.");
         let actual = bits_to_bytes(&bits).unwrap();
         assert_eq!(actual, expected, "Input: {input}")
     }
