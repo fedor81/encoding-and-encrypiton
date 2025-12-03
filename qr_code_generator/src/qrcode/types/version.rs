@@ -1,0 +1,46 @@
+use super::{CorrectionLevel, Version, tables};
+use crate::utils;
+
+impl Version {
+    /// # Panics
+    /// if not `1 <= version <= 40`
+    pub fn new(version: u8) -> Self {
+        assert!(1 <= version && version <= 40);
+        Self(version)
+    }
+
+    /// Количество модулей QR-кода
+    pub const fn size(self) -> usize {
+        self.0 as usize * 4 + 17
+    }
+
+    /// # Panics
+    pub fn build(bits_count: usize, corr_level: CorrectionLevel) -> Self {
+        for version in 1..=40 {
+            if bits_count <= Self::new(version).max_data_len(corr_level) {
+                return Self::new(version);
+            }
+        }
+        panic!("The version cannot be selected, there is too much data.")
+    }
+
+    pub fn max_data_len(self, corr_level: CorrectionLevel) -> usize {
+        tables::fetch(self, corr_level, &tables::DATA_LENGTHS).unwrap() as usize
+    }
+
+    /// Возвращает номер версии
+    pub fn num(self) -> usize {
+        self.0 as usize
+    }
+
+    pub fn get_alignment_positions(self) -> &'static [u8] {
+        match self.0 {
+            1..=40 => tables::ALIGNMENT_PATTERN_POSITIONS[self.0 as usize],
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_version_info_bits(self) -> Vec<bool> {
+        utils::byte_to_bits(self.0)
+    }
+}
