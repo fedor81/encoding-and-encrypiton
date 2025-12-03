@@ -36,7 +36,7 @@ impl Version {
 
     pub fn get_alignment_positions(self) -> &'static [u8] {
         match self.0 {
-            1..=40 => tables::ALIGNMENT_PATTERN_POSITIONS[self.0 as usize],
+            1..=40 => tables::ALIGNMENT_PATTERN_POSITIONS[self.0 as usize - 1],
             _ => unreachable!(),
         }
     }

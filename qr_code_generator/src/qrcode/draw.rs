@@ -33,7 +33,7 @@ impl QRCode {
 
     fn add_patterns(modules: &mut Canvas, version: Version) -> Result<()> {
         Self::add_finder_patterns(modules).context("add finder patterns")?;
-        Self::add_separators(modules).context("add separators")?;
+        Self::add_separators(modules).context("add separators for finders")?;
         Self::add_timing_patterns(modules).context("add timing patterns")?;
         Self::add_alignment_patterns(modules, version).context("add alignment patterns")?;
         Self::add_version_info(modules, version).context("add version information")?;
