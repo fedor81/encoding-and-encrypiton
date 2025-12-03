@@ -5,14 +5,17 @@ use super::{
     tables::{self, fetch},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     data: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct BlocksInfo {
+    /// Количество байт в одном блоке
     size: u8,
+
+    /// Количество блоков
     count: u8,
 }
 
@@ -71,8 +74,8 @@ impl BlocksInfo {
         let (info1, info2) = BlocksInfo::fetch(version, corr_level)?;
 
         anyhow::ensure!(
-            data.len() != info1.count() * info1.size() + info2.count() * info2.size(),
-            "The data length does not match the number of blocks and block sizes:\
+            data.len() == info1.count() * info1.size() + info2.count() * info2.size(),
+            "The data length does not match the number of blocks and block sizes: \
             {} != ({} * {}) + ({} * {})",
             data.len(),
             info1.count(),
@@ -90,11 +93,35 @@ impl BlocksInfo {
             .map(|chunk| Block::from(chunk.to_vec()))
             .collect::<Vec<_>>();
 
-        // Некоторые версии QR-кода имеют блоки разного размера
+        // Некоторые версии QR-кода имеют два размера блоков
         if part2.len() > 0 {
             blocks.extend(part2.chunks(info2.size()).map(|chunk| Block::from(chunk.to_vec())));
         }
 
         Ok(blocks)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+    use rstest::{fixture, rstest};
+
+    use super::*;
+
+    #[rstest]
+    #[case(&vec![1; 9], Version::new(1), CorrectionLevel::H, vec![vec![1; 9]])]
+    fn test_split_into_blocks(
+        #[case] data: &[u8],
+        #[case] version: Version,
+        #[case] corr_level: CorrectionLevel,
+        #[case] expected: Vec<Vec<u8>>,
+    ) {
+        let expected = expected.iter().map(|v| Block::from(v.as_slice())).collect::<Vec<_>>();
+
+        assert_eq!(
+            BlocksInfo::split_into_blocks(data, version, corr_level).unwrap(),
+            expected
+        );
     }
 }

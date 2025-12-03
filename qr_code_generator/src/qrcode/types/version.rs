@@ -15,17 +15,18 @@ impl Version {
     }
 
     /// # Panics
-    pub fn build(bits_count: usize, corr_level: CorrectionLevel) -> Self {
+    pub fn build(bytes_count: usize, corr_level: CorrectionLevel) -> Self {
         for version in 1..=40 {
-            if bits_count <= Self::new(version).max_data_len(corr_level) {
+            if bytes_count <= Self::new(version).max_bytes_count(corr_level) {
                 return Self::new(version);
             }
         }
-        panic!("Version cannot be selected for level: {corr_level:?}, too much data: {bits_count}")
+        panic!("Version cannot be selected for level: {corr_level:?}, too much data: {bytes_count}")
     }
 
-    pub fn max_data_len(self, corr_level: CorrectionLevel) -> usize {
-        tables::fetch(self, corr_level, &tables::DATA_LENGTHS).unwrap() as usize
+    /// Возвращает максимально допустимое количество бит
+    pub fn max_bytes_count(self, corr_level: CorrectionLevel) -> usize {
+        tables::fetch(self, corr_level, &tables::DATA_LENGTHS).unwrap() as usize / 8
     }
 
     /// Возвращает номер версии
@@ -58,6 +59,6 @@ mod tests {
     #[case(18671, CorrectionLevel::M, Version(40))]
     #[case(16, CorrectionLevel::L, Version(1))]
     fn test_build(#[case] bits_count: usize, #[case] corr_level: CorrectionLevel, #[case] expected: Version) {
-        assert_eq!(Version::build(bits_count, corr_level), expected);
+        assert_eq!(Version::build(bits_count / 8, corr_level), expected);
     }
 }

@@ -102,7 +102,7 @@ impl QRCode {
     fn expand_to_max_size(data: &mut Vec<u8>, version: Version, corr_level: CorrectionLevel) {
         let mut push_ec = true;
 
-        while data.len() < version.max_data_len(corr_level) {
+        while data.len() < version.max_bytes_count(corr_level) {
             if push_ec {
                 data.push(0b11101100); // EC
             } else {
@@ -140,10 +140,11 @@ mod tests {
         for version in 1..=40 {
             for corr_level in [CL::L, CL::M, CL::Q, CL::H] {
                 let version = Version::new(version);
-                let expected_len = version.max_data_len(corr_level);
+                let expected_len = version.max_bytes_count(corr_level);
 
                 let mut data = vec![1, 2, 3];
                 let start_len = data.len();
+
                 QRCode::expand_to_max_size(&mut data, version, corr_level);
 
                 assert_eq!(
@@ -151,14 +152,17 @@ mod tests {
                     expected_len,
                     "Failed for version: {version:?}, corr_level: {corr_level:?}",
                 );
+
+                let filled_len = expected_len - start_len;
+
                 assert_eq!(
                     data.iter().filter(|&&byte| byte == 0b11101100).count(),
-                    (expected_len - start_len) / 2 + 1, // +1 для последнего байта
+                    filled_len / 2 + filled_len % 2, // +1 если число заполненных байт нечетное
                     "Failed for version: {version:?}, corr_level: {corr_level:?}",
                 );
                 assert_eq!(
                     data.iter().filter(|&&byte| byte == 0b00010001).count(),
-                    (expected_len - start_len) / 2,
+                    filled_len / 2,
                     "Failed for version: {version:?}, corr_level: {corr_level:?}",
                 );
             }
