@@ -82,14 +82,36 @@ impl QRCode {
     fn add_separators(modules: &mut Canvas) -> Result<()> {
         let size = modules.len();
 
-        for i in 0..8 {
-            if i < 7 {
-                modules.try_set(7, i, Module::Light)?; // справа
-                modules.try_set(i, 7, Module::Light)?; // снизу
-            }
-            modules.try_set(7, size - 8, Module::Light)?; // слева от верхнего правого
-            modules.try_set(size - 8, 7, Module::Light)?; // сверху от нижнего левого
+        for y in 0..8 {
+            // Вертикально справа от левого верхнего finder (x=7)
+            modules.try_set(7, y, Module::Light).context("vertical top-right")?;
+
+            // Слева от верхнего правого finder (x = size - 8)
+            modules
+                .try_set(size - 8, y, Module::Light)
+                .context("vertical top-right")?;
+
+            // Справа от нижнего левого finder (x = 7)
+            modules
+                .try_set(7, size - 8 + y, Module::Light)
+                .context("vertical bottom-left")?;
         }
+
+        for x in 0..7 {
+            // Горизонтально под левым верхним finder (y=7)
+            modules.try_set(x, 7, Module::Light).context("horizontal top-left")?;
+
+            // Под правым верхним finder (y=7)
+            modules
+                .try_set(size - 7 + x, 7, Module::Light)
+                .context("horizontal top-right")?;
+
+            // Над нижним левым finder (y = size - 8)
+            modules
+                .try_set(x, size - 8, Module::Light)
+                .context("horizontal bottom-left")?;
+        }
+
         Ok(())
     }
 
