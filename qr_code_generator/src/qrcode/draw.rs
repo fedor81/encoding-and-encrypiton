@@ -24,7 +24,7 @@ impl Drawable for QRCode {
 impl QRCode {
     pub fn build_modules(data: &[u8], corr_level: CorrectionLevel, version: Version) -> Result<Canvas> {
         let size = version.size();
-        let mut modules = vec![vec![Module::default(); size]; size];
+        let mut modules = Canvas::new(size);
 
         Self::add_patterns(&mut modules, version)?;
 
@@ -65,7 +65,9 @@ impl QRCode {
     fn add_finder_pattern(modules: &mut Canvas, x: usize, y: usize) -> Result<()> {
         for i in 0..7 {
             for j in 0..7 {
-                modules[y + j][x + i].try_set(
+                modules.try_set(
+                    x + i,
+                    y + j,
                     if i == 0 || i == 6 || j == 0 || j == 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4) {
                         Module::Dark
                     } else {
@@ -82,11 +84,11 @@ impl QRCode {
 
         for i in 0..8 {
             if i < 7 {
-                modules[7][i].try_set(Module::Light)?; // справа
-                modules[i][7].try_set(Module::Light)?; // снизу
+                modules.try_set(7, i, Module::Light)?; // справа
+                modules.try_set(i, 7, Module::Light)?; // снизу
             }
-            modules[7][size - 8].try_set(Module::Light)?; // слева от верхнего правого
-            modules[size - 8][7].try_set(Module::Light)?; // сверху от нижнего левого
+            modules.try_set(7, size - 8, Module::Light)?; // слева от верхнего правого
+            modules.try_set(size - 8, 7, Module::Light)?; // сверху от нижнего левого
         }
         Ok(())
     }
@@ -99,15 +101,15 @@ impl QRCode {
 
         // Горизонтальный тайминг
         for i in 8..size - 8 {
-            modules[6][i]
-                .try_set(if i % 2 == 0 { Module::Dark } else { Module::Light })
+            modules
+                .try_set(6, i, if i % 2 == 0 { Module::Dark } else { Module::Light })
                 .context("set horizontal timing")?;
         }
 
         // Вертикальный тайминг
         for i in 8..size - 8 {
-            modules[i][6]
-                .try_set(if i % 2 == 0 { Module::Dark } else { Module::Light })
+            modules
+                .try_set(i, 6, if i % 2 == 0 { Module::Dark } else { Module::Light })
                 .context("set vertical timing")?;
         }
         Ok(())
@@ -146,12 +148,16 @@ impl QRCode {
 
         for i in 0..5 {
             for j in 0..5 {
-                modules[y - 2 + j][x - 2 + i]
-                    .try_set(if i == 0 || i == 4 || j == 0 || j == 4 || (i == 2 && j == 2) {
-                        Module::Dark
-                    } else {
-                        Module::Light
-                    })
+                modules
+                    .try_set(
+                        x - 2 + i,
+                        y - 2 + j,
+                        if i == 0 || i == 4 || j == 0 || j == 4 || (i == 2 && j == 2) {
+                            Module::Dark
+                        } else {
+                            Module::Light
+                        },
+                    )
                     .with_context(|| {
                         format!(
                             "failed to set module at ({}, {}) while adding alignment pattern centered at ({x}, {y})",
@@ -177,7 +183,7 @@ impl QRCode {
                 let module = if version_info[i] { Module::Dark } else { Module::Light };
 
                 // Нижний левый
-                modules[size - 11 + row][col].try_set(module).with_context(|| {
+                modules.try_set(col, size - 11 + row, module).with_context(|| {
                     format!(
                         "failed to set version info bit {i} at ({}, {col}) in bottom-left area",
                         size - 11 + row,
@@ -185,7 +191,7 @@ impl QRCode {
                 })?;
 
                 // Верхний правый
-                modules[row][size - 11 + col].try_set(module).with_context(|| {
+                modules.try_set(size - 11 + col, row, module).with_context(|| {
                     format!(
                         "failed to set version info bit {i} at ({row}, {}) in top-right area",
                         size - 11 + col

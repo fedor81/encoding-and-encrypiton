@@ -1,12 +1,15 @@
 use super::tables;
 
+mod canvas;
 mod correction_level;
 mod mask;
 mod module;
 mod version;
 
 /// QR код в виде матрицы модулей
-pub type Canvas = Vec<Vec<Module>>;
+pub struct Canvas {
+    modules: Vec<Vec<Module>>,
+}
 
 /// QR коды разных уровней коррекции
 #[derive(Debug, Clone, Copy, PartialEq)]
