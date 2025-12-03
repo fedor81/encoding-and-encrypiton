@@ -132,4 +132,36 @@ mod tests {
             input
         );
     }
+
+    #[rstest]
+    fn test_expand_to_max_size() {
+        use CorrectionLevel as CL;
+
+        for version in 1..=40 {
+            for corr_level in [CL::L, CL::M, CL::Q, CL::H] {
+                let version = Version::new(version);
+                let expected_len = version.max_data_len(corr_level);
+
+                let mut data = vec![1, 2, 3];
+                let start_len = data.len();
+                QRCode::expand_to_max_size(&mut data, version, corr_level);
+
+                assert_eq!(
+                    data.len(),
+                    expected_len,
+                    "Failed for version: {version:?}, corr_level: {corr_level:?}",
+                );
+                assert_eq!(
+                    data.iter().filter(|&&byte| byte == 0b11101100).count(),
+                    (expected_len - start_len) / 2 + 1, // +1 для последнего байта
+                    "Failed for version: {version:?}, corr_level: {corr_level:?}",
+                );
+                assert_eq!(
+                    data.iter().filter(|&&byte| byte == 0b00010001).count(),
+                    (expected_len - start_len) / 2,
+                    "Failed for version: {version:?}, corr_level: {corr_level:?}",
+                );
+            }
+        }
+    }
 }
