@@ -21,7 +21,7 @@ impl Version {
                 return Self::new(version);
             }
         }
-        panic!("The version cannot be selected, there is too much data.")
+        panic!("Version cannot be selected for level: {corr_level:?}, too much data: {bits_count}")
     }
 
     pub fn max_data_len(self, corr_level: CorrectionLevel) -> usize {
@@ -42,5 +42,22 @@ impl Version {
 
     pub fn get_version_info_bits(self) -> Vec<bool> {
         utils::byte_to_bits(self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case(3550, CorrectionLevel::Q, Version(19))]
+    #[case(2725, CorrectionLevel::H, Version(19))]
+    #[case(18671, CorrectionLevel::M, Version(40))]
+    #[case(16, CorrectionLevel::L, Version(1))]
+    fn test_build(#[case] bits_count: usize, #[case] corr_level: CorrectionLevel, #[case] expected: Version) {
+        assert_eq!(Version::build(bits_count, corr_level), expected);
     }
 }

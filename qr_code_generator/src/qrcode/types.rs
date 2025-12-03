@@ -32,7 +32,7 @@ pub enum Module {
     Unused,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Version(u8);
 
 /// The mask patterns. Since QR code and Micro QR code do not use the same
