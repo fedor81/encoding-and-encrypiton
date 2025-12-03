@@ -1,6 +1,6 @@
 use anyhow::{Context, Ok, Result};
 
-use crate::utils::{add_zeros, bits_to_bytes, bytes_to_bits};
+use crate::utils::{self, add_zeros, bits_to_bytes, bytes_to_bits};
 
 mod blocks;
 mod draw;
@@ -82,17 +82,20 @@ impl QRCode {
     /// - 0100 для побайтового
     const BYTES_ENCODING: &[bool] = &[false, true, false, false];
 
-    /// Добавляет способ кдирования и длину данных
+    /// Добавляет способ кодирования и длину данных
     fn add_service_information(data: &[u8]) -> Vec<u8> {
-        let payload_len = data.len();
         let mut result = Vec::new();
 
+        // Количество бит выделяемое для data.len()
+        let length_bits_count = if data.len() < 256 { 8 } else { 16 };
+        let payload_len = &utils::to_bit_array(data.len() as u32, length_bits_count);
+
         result.extend_from_slice(Self::BYTES_ENCODING);
-        result.extend_from_slice(&bytes_to_bits(&payload_len.to_le_bytes()));
+        result.extend_from_slice(payload_len);
         result.extend_from_slice(&bytes_to_bits(data));
 
         add_zeros(&mut result); // Дописываем нули в конец до кратности 8
-        bits_to_bytes(&result).expect("The sequence must be a multiple of 8 after add zeros")
+        bits_to_bytes(&result).expect("The sequence must be a multiple of 8 after add_zeros")
     }
 
     /// Дополняет данные до максимально возможной длины в версии чередующимися байтами EC и 11
@@ -107,5 +110,26 @@ impl QRCode {
             }
             push_ec = !push_ec;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    // Input         Encoding Length    Data      filled
+    // 00000001      0100     0000_0001 0000_0001 0000 = [64, 16, 16]
+    #[case(&vec![1], &vec![64, 16, 16])]
+    fn test_add_service_information(#[case] input: &[u8], #[case] expected: &[u8]) {
+        assert_eq!(
+            &QRCode::add_service_information(input),
+            expected,
+            "Failed for input: {:?}",
+            input
+        );
     }
 }

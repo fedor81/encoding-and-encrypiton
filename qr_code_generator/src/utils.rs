@@ -46,6 +46,16 @@ pub fn byte_to_bits(byte: u8) -> Vec<bool> {
     result
 }
 
+/// Переводит число в вектор бит, указанного размера. Первые если в числе бит меньше чем длина вектора,
+/// то они принимаются нулями.
+pub fn to_bit_array(value: u32, size: usize) -> Vec<bool> {
+    let mut bits = vec![false; size];
+    for i in 0..size {
+        bits[size - i - 1] = (value >> i) & 1 == 1;
+    }
+    bits
+}
+
 /// Добавляет нули в конец последовательности бит, чтобы длина стала кратной 8-ми.
 pub fn add_zeros(bits: &mut Vec<bool>) {
     match bits.len() % 8 {

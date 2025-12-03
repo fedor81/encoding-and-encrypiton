@@ -208,16 +208,6 @@ pub const ALIGNMENT_PATTERN_POSITIONS: [&[u8]; 40] = [
     &[6, 30, 58, 86, 114, 142, 170],
 ];
 
-/// Переводит число в вектор бит, указанного размера. Первые если в числе бит меньше чем длина вектора,
-/// то они принимаются нулями.
-fn to_bit_array(value: u32, size: usize) -> Vec<bool> {
-    let mut bits = vec![false; size];
-    for i in 0..18 {
-        bits[17 - i] = (value >> i) & 1 == 1;
-    }
-    bits
-}
-
 /// This table is copied from https://habr.com/ru/articles/172525/
 pub const VERSION_INFO: [u32; 34] = [
     0b000010_011110_100110,
@@ -306,12 +296,12 @@ mod tests {
     use pretty_assertions::assert_eq;
     use rstest::rstest;
 
-    use super::*;
+    use crate::utils;
 
     #[rstest]
     #[case(0b111001_000100_010101, &[true, true, true, false, false, true, false, false, false, true, false, false, false, true, false, true, false, true])]
     #[case(0b000010_011110_100110, &[false, false, false, false, true, false, false, true, true, true, true, false, true, false, false, true, true, false])]
     fn test_to_18bit_array(#[case] input: u32, #[case] expected: &[bool]) {
-        assert_eq!(to_bit_array(input, 18), expected);
+        assert_eq!(utils::to_bit_array(input, 18), expected);
     }
 }
