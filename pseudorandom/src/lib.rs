@@ -1,3 +1,4 @@
+mod lcg;
 mod xorshift;
 
 pub use xorshift::XorShift32;

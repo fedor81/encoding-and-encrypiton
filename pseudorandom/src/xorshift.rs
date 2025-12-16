@@ -3,7 +3,12 @@ use crate::PRNG;
 pub struct XorShift32(u32);
 
 impl PRNG for XorShift32 {
+    /// # Panics
+    /// if `seed == 0`
     fn new(seed: u32) -> Self {
+        if seed == 0 {
+            panic!("Seed cannot be zero");
+        }
         Self(seed & 0xFFFFFFFF)
     }
 
