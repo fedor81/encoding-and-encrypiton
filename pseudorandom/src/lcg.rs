@@ -19,14 +19,16 @@ struct LCG {
 }
 
 impl PRNG for LCG {
-    fn new(seed: u32) -> Self {
+    type Item = u32;
+
+    fn new(seed: Self::Item) -> Self {
         let m = 2u32.pow(31);
         let a = 1103515245;
         let c = 12345;
         Self::new(m, a, c, seed)
     }
 
-    fn next(&mut self) -> u32 {
+    fn next(&mut self) -> Self::Item {
         self.x = (self.a * self.x + self.c) % self.m;
         self.x
     }

@@ -7,6 +7,8 @@ pub use xorshift::XorShift32;
 /// которые генерируют последовательности чисел, кажущихся случайными, но полностью определяемых
 /// начальным значением — семенем (seed).
 pub trait PRNG {
-    fn new(seed: u32) -> Self;
-    fn next(&mut self) -> u32;
+    type Item;
+
+    fn new(seed: Self::Item) -> Self;
+    fn next(&mut self) -> Self::Item;
 }
