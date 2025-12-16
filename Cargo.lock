@@ -893,6 +893,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pseudorandom"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "pretty_assertions",
+ "rand",
+ "rstest",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
