@@ -38,5 +38,5 @@ plt.xlabel('$x_i$')
 plt.ylabel('$x_{i+1}$')
 
 plt.tight_layout()
-plt.savefig('prng_quality.png', dpi=150)
+plt.savefig('prng_quality.png', dpi=60)
 plt.show()
