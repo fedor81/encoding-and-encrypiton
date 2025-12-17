@@ -11,8 +11,23 @@ fn main() -> Result<()> {
 impl Cli {
     fn run(&self) -> Result<()> {
         let mut generator = self.algorithm.get_generator(self.seed)?;
-        (0..self.count).for_each(|_| println!("{}", generator.next()));
+
+        if self.test {
+            Self::test(&mut generator);
+        } else {
+            (0..self.count).for_each(|_| println!("{}", generator.next()));
+        }
+
         Ok(())
+    }
+
+    fn test(generator: &mut Box<dyn PRNG<Item = u32>>) {
+        let count = 100_000;
+        let res = pseudorandom::metrics::test_generator(generator, count);
+
+        println!("Среднее: {:.6}", res.mean());
+        println!("Дисперсия: {:.6}", res.variance());
+        println!("Ожидаемо: среднее ≈ 0.5, дисперсия ≈ 0.083333");
     }
 }
 
@@ -33,6 +48,10 @@ struct Cli {
     /// Если не задано, то будет использоваться случайно сгенерированное.
     #[arg(short, long, default_value_t = get_random_seed())]
     seed: u64,
+
+    /// Запускает небольшое тестирование выбранного генератора
+    #[arg(long)]
+    test: bool,
 }
 
 #[derive(Debug, ValueEnum, Default, Clone, Copy, Display)]
@@ -51,10 +70,10 @@ enum Algorithm {
 
 impl Algorithm {
     fn get_generator(&self, seed: u64) -> Result<Box<dyn PRNG<Item = u32>>> {
-        let seed_u32 = (seed % u32::MAX as u64) as u32;
+        let seed = (seed % u32::MAX as u64) as u32;
         Ok(match self {
-            Algorithm::LCG => Box::new(LCG::build(seed_u32)?),
-            Algorithm::XorShift => Box::new(XorShift32::build(seed_u32)?),
+            Algorithm::LCG => Box::new(LCG::build(seed)?),
+            Algorithm::XorShift => Box::new(XorShift32::build(seed)?),
         })
     }
 }
