@@ -901,6 +901,7 @@ dependencies = [
  "pretty_assertions",
  "rand",
  "rstest",
+ "strum",
 ]
 
 [[package]]

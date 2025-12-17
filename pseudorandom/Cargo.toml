@@ -10,6 +10,7 @@ path = "src/bin/pseudorandom.rs"
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.52", features = ["derive"] }
+strum = { version = "0.27.2", features = ["derive"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
