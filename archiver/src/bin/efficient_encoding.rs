@@ -9,10 +9,8 @@ fn main() {
 
     let words = vec![0u8; probabilities.len()];
 
-    let shannon_fano_codes = ShannonFanoEncoder::build_optimal_codes(
-        words.iter().copied().collect(),
-        probabilities.clone(),
-    );
+    let shannon_fano_codes =
+        ShannonFanoEncoder::build_optimal_codes(words.iter().copied().collect(), probabilities.clone());
     print_codes("Shannon-Fano codes", &shannon_fano_codes);
 
     let huffman_codes = HuffmanArchiver::build_optimal_codes(words, probabilities);

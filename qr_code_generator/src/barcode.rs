@@ -39,8 +39,7 @@ mod tests {
 
     #[test]
     fn test_draw_barcode_works() {
-        let code = Code128::encode_with_codeset("Hello World", code128::CodeSet::B)
-            .expect("Code128 doesn't work");
+        let code = Code128::encode_with_codeset("Hello World", code128::CodeSet::B).expect("Code128 doesn't work");
         let path = "test_draw_barcode_works.png";
         assert!(draw_barcode(&code, path).is_ok());
         assert!(Path::new(path).exists());

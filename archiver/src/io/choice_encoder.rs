@@ -12,9 +12,7 @@ impl EncoderChoice {
     pub fn build_optimal_codes(&self, probabilities: Vec<f64>) -> Codes {
         let words = vec![0u8; probabilities.len()];
         match self {
-            EncoderChoice::ShannonFano(_) => {
-                ShannonFanoEncoder::build_optimal_codes(words, probabilities)
-            }
+            EncoderChoice::ShannonFano(_) => ShannonFanoEncoder::build_optimal_codes(words, probabilities),
             EncoderChoice::Huffman(_) => HuffmanArchiver::build_optimal_codes(words, probabilities),
         }
     }

@@ -72,11 +72,7 @@ impl Codes {
 
     /// Вычисляет энтропию по формуле: `-Σ(pi * log2(pi))`
     pub fn entropy(&self) -> f64 {
-        -(self
-            .probabilities
-            .iter()
-            .map(|&p| p * p.log2())
-            .sum::<f64>())
+        -(self.probabilities.iter().map(|&p| p * p.log2()).sum::<f64>())
     }
 }
 

@@ -171,8 +171,7 @@ pub trait GF256Poly: GF256 {
 
         // Деление меньшего на больший
         if dividend.len() < divisor.len()
-            || (dividend.len() == divisor.len()
-                && dividend[dividend.len() - 1] < divisor[divisor.len() - 1])
+            || (dividend.len() == divisor.len() && dividend[dividend.len() - 1] < divisor[divisor.len() - 1])
         {
             return (vec![0], dividend.to_vec());
         }

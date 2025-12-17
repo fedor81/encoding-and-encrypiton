@@ -16,10 +16,7 @@ pub fn print_codes(name: &str, codes: &Codes) {
     println!("Probabilities: {:?}", codes.probabilities());
     println!("Codes: {:?}", codes.codes());
     println!("Mean length: {}", codes.mean_code_length());
-    println!(
-        "Relative efficiency ratio: {}",
-        codes.relative_efficiency_ratio()
-    );
+    println!("Relative efficiency ratio: {}", codes.relative_efficiency_ratio());
     println!(
         "Statistical compression ratio: {}",
         codes.statistical_compression_ratio()
@@ -31,14 +28,8 @@ pub fn print_sizes<P: AsRef<Path>>(target: P, destination: P) -> Result<()> {
     let original_size = std::fs::metadata(&target)?.len();
     let archived_size = std::fs::metadata(&destination)?.len();
 
-    println!(
-        "\nOriginal file size: {}",
-        format_size(original_size, DECIMAL)
-    );
-    println!(
-        "Archived file size: {}",
-        format_size(archived_size, DECIMAL)
-    );
+    println!("\nOriginal file size: {}", format_size(original_size, DECIMAL));
+    println!("Archived file size: {}", format_size(archived_size, DECIMAL));
     println!(
         "Compression ratio: {:.2}%",
         (archived_size as f64 / original_size as f64) * 100.0

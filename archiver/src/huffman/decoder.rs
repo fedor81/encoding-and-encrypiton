@@ -71,10 +71,7 @@ mod tests {
             right: HuffmanTree::new_leaf(0.5, 1, 8).into(),
             count_codes: 2,
         });
-        assert_eq!(
-            decoder.decode_string("0101011").unwrap(),
-            vec![5, 8, 5, 8, 5, 8, 8],
-        );
+        assert_eq!(decoder.decode_string("0101011").unwrap(), vec![5, 8, 5, 8, 5, 8, 8],);
     }
 
     #[test]

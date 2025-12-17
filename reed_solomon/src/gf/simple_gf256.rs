@@ -68,10 +68,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_gf256_performance() {
-        gf_tests::arithmetic_operations::test_gf256_performance(
-            SimpleGF256 {},
-            std::time::Duration::from_secs(70),
-        );
+        gf_tests::arithmetic_operations::test_gf256_performance(SimpleGF256 {}, std::time::Duration::from_secs(70));
     }
 
     #[test]

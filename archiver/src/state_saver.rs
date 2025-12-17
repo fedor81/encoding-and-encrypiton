@@ -25,8 +25,7 @@ where
     fn read_state(file: &mut File) -> Result<Vec<u8>> {
         // Читаем размер состояния (usize)
         let mut state_size = [0; std::mem::size_of::<usize>()];
-        file.read_exact(&mut state_size)
-            .context("Failed to read state size")?;
+        file.read_exact(&mut state_size).context("Failed to read state size")?;
         let state_size = usize::from_le_bytes(state_size);
 
         if state_size == 0 {
@@ -35,8 +34,7 @@ where
 
         // Читаем состояние
         let mut state = vec![0; state_size];
-        file.read_exact(&mut state)
-            .context("Failed to read state")?;
+        file.read_exact(&mut state).context("Failed to read state")?;
         Ok(state)
     }
 }

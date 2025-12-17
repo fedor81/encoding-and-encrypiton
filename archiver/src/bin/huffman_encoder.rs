@@ -13,9 +13,8 @@ fn main() -> Result<()> {
         anyhow::bail!("File does not exist: {}", target.display());
     }
 
-    let destination = read_filepath(
-        &"Please enter the path where you would like the result of the operation to be saved:",
-    )?;
+    let destination =
+        read_filepath(&"Please enter the path where you would like the result of the operation to be saved:")?;
 
     HuffmanArchiver::archive(&target, &destination).unwrap();
 

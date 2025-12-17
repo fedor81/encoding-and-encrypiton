@@ -45,11 +45,7 @@ fn test_generator_poly_properties(gf: &FastGF256, gen_poly: RefPoly, control: us
     }
 
     // 4. Проверяем, что полином мончический (старший коэффициент = 1)
-    assert_eq!(
-        gen_poly[gen_poly.len() - 1],
-        1,
-        "Generator polynomial should be monic"
-    );
+    assert_eq!(gen_poly[gen_poly.len() - 1], 1, "Generator polynomial should be monic");
 
     // 5. Проверяем, что полином не имеет корней кроме α^0..α^(nsym-1)
     // (это сложно проверить полностью, но проверим несколько случайных точек)
@@ -101,11 +97,7 @@ fn test_specific_generator_polys() {
     for i in 0..3 {
         let root = gf.pow_primitive_poly(i);
         let value = gf.eval_poly(&gen_poly_3, root);
-        assert_eq!(
-            value, 0,
-            "Generator polynomial for nsym=3 should have root α^{}",
-            i
-        );
+        assert_eq!(value, 0, "Generator polynomial for nsym=3 should have root α^{}", i);
     }
 
     // Проверяем, что полином имеет правильную степень
@@ -156,19 +148,11 @@ fn test_build_gen_poly_edge_cases() {
         2,
         "Generator polynomial for nsym=1 should have length 2"
     );
-    assert_eq!(
-        gen_poly_1[gen_poly_1.len() - 1],
-        1,
-        "Leading coefficient should be 1"
-    );
+    assert_eq!(gen_poly_1[gen_poly_1.len() - 1], 1, "Leading coefficient should be 1");
 
     // Проверяем корень α^0
     let root = gf.pow_primitive_poly(0);
-    assert_eq!(
-        gf.eval_poly(&gen_poly_1, root),
-        0,
-        "Root α^0 should be zero"
-    );
+    assert_eq!(gf.eval_poly(&gen_poly_1, root), 0, "Root α^0 should be zero");
 
     // nsym = максимальное разумное значение
     let gen_poly_large = ReedSolomon::build_gen_poly(&gf, 32);
@@ -188,11 +172,7 @@ fn test_build_gen_poly_edge_cases() {
         // Проверяем только первые 5 корней для скорости
         let root = gf.pow_primitive_poly(i);
         let value = gf.eval_poly(&gen_poly_large, root);
-        assert_eq!(
-            value, 0,
-            "Large generator polynomial should have root α^{}",
-            i
-        );
+        assert_eq!(value, 0, "Large generator polynomial should have root α^{}", i);
     }
 }
 
@@ -227,10 +207,7 @@ fn test_generator_poly_roots() {
         let root = gf.pow_primitive_poly(i as u8);
         let value = gf.eval_poly(&gen_poly, root);
 
-        println!(
-            "Root test: α^{} = {}, polynomial value = {}",
-            i, root, value
-        );
+        println!("Root test: α^{} = {}, polynomial value = {}", i, root, value);
 
         assert_eq!(
             value, 0,
@@ -244,16 +221,9 @@ fn test_generator_poly_roots() {
         let point = gf.pow_primitive_poly(i as u8);
         let value = gf.eval_poly(&gen_poly, point);
 
-        println!(
-            "Non-root test: α^{} = {}, polynomial value = {}",
-            i, point, value
-        );
+        println!("Non-root test: α^{} = {}, polynomial value = {}", i, point, value);
 
-        assert_ne!(
-            value, 0,
-            "Generator polynomial should not be zero at α^{}",
-            i
-        );
+        assert_ne!(value, 0, "Generator polynomial should not be zero at α^{}", i);
     }
 }
 

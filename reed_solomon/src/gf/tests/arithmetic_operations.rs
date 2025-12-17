@@ -113,11 +113,7 @@ fn test_distributive<T: GF256>(gf: &T) {
             for c in 0..=50u8 {
                 let left = gf.mul(a, gf.add(b, c));
                 let right = gf.add(gf.mul(a, b), gf.mul(a, c));
-                assert_eq!(
-                    left, right,
-                    "Distributive property failed for {} * ({} + {})",
-                    a, b, c
-                );
+                assert_eq!(left, right, "Distributive property failed for {} * ({} + {})", a, b, c);
             }
         }
     }
@@ -176,11 +172,7 @@ fn test_power<T: GF256>(gf: &T) {
         let a2 = gf.pow(a, 2);
         let a3 = gf.pow(a, 3);
         let a2_times_a = gf.mul(a2, a);
-        assert_eq!(
-            a3, a2_times_a,
-            "Power consistency failed: {}^3 != {}^2 * {}",
-            a, a, a
-        );
+        assert_eq!(a3, a2_times_a, "Power consistency failed: {}^3 != {}^2 * {}", a, a, a);
     }
 
     // Проверяем, что a^255 = 1 для всех a ≠ 0 (теорема Ферма для конечных полей)
@@ -231,10 +223,7 @@ fn test_specific_values<T: GF256>(gf: &T) {
 
     // Проверяем, что 2 * 2 = 4 (в начале таблицы должно работать как обычное умножение)
     let two_times_two = gf.mul(2, 2);
-    assert!(
-        two_times_two == 4 || two_times_two != 0,
-        "2 * 2 should be reasonable"
-    );
+    assert!(two_times_two == 4 || two_times_two != 0, "2 * 2 should be reasonable");
 
     // Проверяем, что 128 * 2 = 27 для примитивного полинома 0x11D
     // Это известное значение из таблиц GF(256)

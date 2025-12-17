@@ -20,12 +20,7 @@ fn test_find_locator_derivative() {
             expected = vec![0];
         }
 
-        assert_eq!(
-            expected,
-            rs.find_locator_derivative(&input),
-            "input: {:?}",
-            input
-        );
+        assert_eq!(expected, rs.find_locator_derivative(&input), "input: {:?}", input);
     }
 
     assert_eq!(
@@ -95,10 +90,7 @@ fn test_error_locator_consistency() -> Result<()> {
     let locator1 = encoder.find_error_locator(&syndromes1)?;
     let locator2 = encoder.find_error_locator(&syndromes2)?;
 
-    assert_eq!(
-        locator1, locator2,
-        "Same syndromes should produce same locator"
-    );
+    assert_eq!(locator1, locator2, "Same syndromes should produce same locator");
 
     Ok(())
 }

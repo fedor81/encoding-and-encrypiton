@@ -50,8 +50,7 @@ impl HuffmanArchiver {
         let target = &target.as_ref().to_path_buf();
         let destination = &destination.as_ref().to_path_buf();
 
-        let probabilities =
-            create_probabilities_map(target).context("Failed to create probabilities map")?;
+        let probabilities = create_probabilities_map(target).context("Failed to create probabilities map")?;
         let encoder = Self::new(probabilities);
 
         <Self as FileEncoder>::encode_file(encoder, target, destination)?;
@@ -66,9 +65,7 @@ impl HuffmanArchiver {
             *self.decoder.borrow_mut() = Some(decoder);
         }
 
-        Ok(std::cell::Ref::map(self.decoder.borrow(), |opt| {
-            opt.as_ref().unwrap()
-        }))
+        Ok(std::cell::Ref::map(self.decoder.borrow(), |opt| opt.as_ref().unwrap()))
     }
 
     /// Build word_code from the remaining state bytes
@@ -202,8 +199,7 @@ mod tests {
         );
         assert_eq!(
             vec!["0", "10", "110", "111"],
-            HuffmanArchiver::build_optimal_codes(vec![1, 2, 3, 4], vec![0.5, 0.25, 0.125, 0.125])
-                .codes()
+            HuffmanArchiver::build_optimal_codes(vec![1, 2, 3, 4], vec![0.5, 0.25, 0.125, 0.125]).codes()
         );
         assert_eq!(
             vec!["00", "111", "110", "101", "011", "010", "1001", "1000"],
@@ -241,10 +237,7 @@ mod tests {
     #[test]
     fn test_save_and_load_huffman_archiver_to_file() {
         let expected_archiver = new_simple_archiver();
-        let expected_state = expected_archiver
-            .clone()
-            .save_state()
-            .expect("Failed to save state");
+        let expected_state = expected_archiver.clone().save_state().expect("Failed to save state");
 
         let actual_state;
         let filename = "test_save_and_load_huffman_archiver_to_file.huff";
@@ -265,10 +258,7 @@ mod tests {
         let actual_archiver = HuffmanArchiver::load_state(actual_state).unwrap();
 
         assert_eq!(actual_archiver.word_code, expected_archiver.word_code);
-        assert_eq!(
-            actual_archiver.mean_code_length,
-            expected_archiver.mean_code_length
-        );
+        assert_eq!(actual_archiver.mean_code_length, expected_archiver.mean_code_length);
 
         std::fs::remove_file(filename).ok();
     }

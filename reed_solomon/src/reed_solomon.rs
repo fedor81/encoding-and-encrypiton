@@ -232,12 +232,7 @@ where
     /// где x – это примитивный элемент в степени равной позиции ошибки.
     /// Таким образом, составляется полином ошибки. Его коэффициентами являются значения ошибок Yi
     /// стоящие в позициях, определяемых локаторами ошибок.
-    fn find_error_magnitudes(
-        &self,
-        syndromes: RefPoly,
-        locator: RefPoly,
-        error_positions: &[usize],
-    ) -> Vec<u8> {
+    fn find_error_magnitudes(&self, syndromes: RefPoly, locator: RefPoly, error_positions: &[usize]) -> Vec<u8> {
         // W(x) = L(x)*S(x) mod x^{control_count}
         let mut omega = self.gf.mul_poly(locator, syndromes);
         omega.truncate(self.control_count);
@@ -292,12 +287,7 @@ where
     ///
     /// # Panics
     /// Паникует, если err_pos[i] >= message.len()
-    fn correct_errors(
-        &self,
-        data: RefPoly,
-        error_positions: &[usize],
-        error_magnitudes: &[u8],
-    ) -> Poly {
+    fn correct_errors(&self, data: RefPoly, error_positions: &[usize], error_magnitudes: &[u8]) -> Poly {
         let mut corrected = data.to_vec();
 
         for (&pos, &magnitude) in error_positions.iter().zip(error_magnitudes.iter()) {
@@ -375,8 +365,7 @@ where
 
         let error_locator = self.find_error_locator(&syndromes)?;
         let error_positions = self.find_error_positions(&error_locator, data.len())?;
-        let error_magnitudes =
-            self.find_error_magnitudes(&syndromes, &error_locator, &error_positions);
+        let error_magnitudes = self.find_error_magnitudes(&syndromes, &error_locator, &error_positions);
 
         // Исправляем ошибки
         let corrected = self.correct_errors(data, &error_positions, &error_magnitudes);

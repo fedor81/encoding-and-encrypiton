@@ -37,20 +37,14 @@ where
 
         // Читаем оставшуюся закодированную часть до конца файла
         let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)
-            .context("Failed to read encoded part")?;
+        file.read_to_end(&mut bytes).context("Failed to read encoded part")?;
 
         // Декодируем файл
         let decoder = Self::load_state(state)?;
         decoder.decode_and_write(&bytes, destination, original_size)
     }
 
-    fn decode_and_write<P: AsRef<Path>>(
-        &self,
-        bytes: &[u8],
-        destination: P,
-        original_size: usize,
-    ) -> Result<()> {
+    fn decode_and_write<P: AsRef<Path>>(&self, bytes: &[u8], destination: P, original_size: usize) -> Result<()> {
         let mut decoded = self.decode_bytes(&bytes).context("Failed to decode")?;
 
         // Удаляем возможные лишние байты, появившиеся из-за паддинга при кодировании
@@ -60,9 +54,7 @@ where
 
         // Записываем результат
         let mut target_file = File::create(destination).context("Failed to create file")?;
-        target_file
-            .write_all(&mut decoded)
-            .context("Failed to write to file")?;
+        target_file.write_all(&mut decoded).context("Failed to write to file")?;
 
         Ok(())
     }

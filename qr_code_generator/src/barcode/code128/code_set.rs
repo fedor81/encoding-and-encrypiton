@@ -48,10 +48,7 @@ impl CodeSet {
     pub fn parse(self, pattern: &str) -> Result<Unit> {
         let set_index = self.index();
 
-        match CHARS
-            .iter()
-            .position(|charset| charset.0[set_index] == pattern)
-        {
+        match CHARS.iter().position(|charset| charset.0[set_index] == pattern) {
             Some(index) => Ok(Unit::from(index)),
             None => anyhow::bail!("CodeSet::{:?} does not contains char: {}", self, pattern),
         }

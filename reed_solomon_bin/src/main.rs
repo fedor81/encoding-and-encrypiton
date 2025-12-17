@@ -144,13 +144,7 @@ impl DataFormat {
     }
 
     fn bytes_to_string(data: &[u8]) -> String {
-        format!(
-            "{}",
-            data.iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(" ")
-        )
+        format!("{}", data.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(" "))
     }
 
     /// Попытка интерпретировать как UTF-8
@@ -169,11 +163,7 @@ impl DataFormat {
     }
 
     fn bytes_to_hex(bytes: &[u8]) -> String {
-        bytes
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<Vec<_>>()
-            .join("")
+        bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("")
     }
 
     fn parse_input_data(&self, input: &str) -> Result<Vec<u8>> {
@@ -239,12 +229,8 @@ impl DataFormat {
             trimmed
         };
 
-        if !clean_hex.is_empty()
-            && clean_hex.chars().all(|c| c.is_ascii_hexdigit())
-            && clean_hex.len() % 2 == 0
-        {
-            return hex::decode(clean_hex)
-                .map_err(|e| anyhow::anyhow!("Ошибка парсинга как hex: {}", e));
+        if !clean_hex.is_empty() && clean_hex.chars().all(|c| c.is_ascii_hexdigit()) && clean_hex.len() % 2 == 0 {
+            return hex::decode(clean_hex).map_err(|e| anyhow::anyhow!("Ошибка парсинга как hex: {}", e));
         }
 
         // 2. Проверяем, похоже ли на список байтов (через пробелы)

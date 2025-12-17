@@ -255,30 +255,30 @@ fn test_encode_large_control_small_data() {
 fn debug_simple_test() {
     let encoder = create_encoder(2);
     let data = vec![1, 2];
-    
+
     println!("Data: {:?}", data);
-    
+
     let encoded = encoder.encode(&data).unwrap();
     println!("Encoded: {:?}", encoded);
-    
+
     // Проверим синдромы
     let syndromes = encoder.calculate_syndromes(&encoded);
     println!("Syndromes: {:?}", syndromes);
-    
+
     // Проверим остаток от деления
     let remainder = encoder.gf.mod_poly(&encoded, &encoder.gen_poly);
     println!("Remainder: {:?}", remainder);
-    
+
     // Проверим порождающий многочлен
     println!("Generator polynomial: {:?}", encoder.gen_poly);
-    
+
     // Проверим корни порождающего многочлена
     for i in 0..2 {
         let root = encoder.gf.alpha_pow(i as u8);
         let value = encoder.gf.eval_poly(&encoder.gen_poly, root);
         println!("Root α^{} = {}, polynomial value = {}", i, root, value);
     }
-    
+
     // Проверим, что синдромы равны нулю
     check_syndromes(&encoder, &encoded).unwrap();
 }
@@ -317,4 +317,3 @@ fn test_random_stress() {
         }
     }
 }
-

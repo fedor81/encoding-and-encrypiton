@@ -8,14 +8,8 @@ use std::{
 
 use super::FrequencyMap;
 
-pub fn sort_words_and_probabilities(
-    words: Vec<u8>,
-    probabilities: Vec<f64>,
-) -> (Vec<u8>, Vec<f64>) {
-    let mut word_probability = words
-        .into_iter()
-        .zip(probabilities.into_iter())
-        .collect::<Vec<_>>();
+pub fn sort_words_and_probabilities(words: Vec<u8>, probabilities: Vec<f64>) -> (Vec<u8>, Vec<f64>) {
+    let mut word_probability = words.into_iter().zip(probabilities.into_iter()).collect::<Vec<_>>();
 
     word_probability.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap().reverse());
     word_probability.into_iter().unzip()
@@ -27,8 +21,7 @@ pub fn create_probabilities_map(path: &PathBuf) -> Result<HashMap<u8, f64>> {
         anyhow::bail!("File does not exist: {}", path.display());
     }
 
-    let file =
-        File::open(&path).with_context(|| format!("❌ Failed to open file: {}", path.display()))?;
+    let file = File::open(&path).with_context(|| format!("❌ Failed to open file: {}", path.display()))?;
     let mut reader = BufReader::new(file);
 
     // 1MB buffer
@@ -87,19 +80,15 @@ pub fn cmp_files_text<P: AsRef<Path>>(actual_path: P, expected_path: P) {
     let expected_path = expected_path.as_ref();
 
     // Открытие файлов
-    let actual_file = File::open(actual_path)
-        .unwrap_or_else(|_| panic!("Failed to open actual file: {}", actual_path.display()));
+    let actual_file =
+        File::open(actual_path).unwrap_or_else(|_| panic!("Failed to open actual file: {}", actual_path.display()));
     let expected_file = File::open(expected_path)
         .unwrap_or_else(|_| panic!("Failed to open expected file: {}", expected_path.display()));
 
     let actual_reader = BufReader::new(actual_file);
     let expected_reader = BufReader::new(expected_file);
 
-    for (line_num, (actual_line, expected_line)) in actual_reader
-        .lines()
-        .zip(expected_reader.lines())
-        .enumerate()
-    {
+    for (line_num, (actual_line, expected_line)) in actual_reader.lines().zip(expected_reader.lines()).enumerate() {
         let line_num = line_num + 1; // Нумерация строк с 1
 
         let actual = actual_line.unwrap_or_else(|err| {
@@ -168,18 +157,10 @@ pub fn cmp_files<P: AsRef<Path>>(actual_path: P, expected_path: P) {
     }
 
     // Сравнение метаданных
-    let actual_metadata = fs::metadata(actual_path).unwrap_or_else(|_| {
-        panic!(
-            "Failed to get metadata for actual file: {}",
-            actual_path.display()
-        )
-    });
-    let expected_metadata = fs::metadata(expected_path).unwrap_or_else(|_| {
-        panic!(
-            "Failed to get metadata for expected file: {}",
-            expected_path.display()
-        )
-    });
+    let actual_metadata = fs::metadata(actual_path)
+        .unwrap_or_else(|_| panic!("Failed to get metadata for actual file: {}", actual_path.display()));
+    let expected_metadata = fs::metadata(expected_path)
+        .unwrap_or_else(|_| panic!("Failed to get metadata for expected file: {}", expected_path.display()));
 
     assert_eq!(
         actual_metadata.len(),
@@ -192,8 +173,8 @@ pub fn cmp_files<P: AsRef<Path>>(actual_path: P, expected_path: P) {
     );
 
     // Открытие файлов
-    let mut actual_file = File::open(actual_path)
-        .unwrap_or_else(|_| panic!("Failed to open actual file: {}", actual_path.display()));
+    let mut actual_file =
+        File::open(actual_path).unwrap_or_else(|_| panic!("Failed to open actual file: {}", actual_path.display()));
     let mut expected_file = File::open(expected_path)
         .unwrap_or_else(|_| panic!("Failed to open expected file: {}", expected_path.display()));
 
@@ -209,8 +190,7 @@ pub fn cmp_files<P: AsRef<Path>>(actual_path: P, expected_path: P) {
         .unwrap_or_else(|_| panic!("Failed to read expected file: {}", expected_path.display()));
 
     // Поиск первого отличающегося байта
-    for (i, (actual_byte, expected_byte)) in actual_buf.iter().zip(expected_buf.iter()).enumerate()
-    {
+    for (i, (actual_byte, expected_byte)) in actual_buf.iter().zip(expected_buf.iter()).enumerate() {
         if actual_byte != expected_byte {
             panic!(
                 "Files differ at byte {}:\n  actual: 0x{:02x} ({})\n  expected: 0x{:02x} ({})\nFile: {}",
@@ -255,12 +235,7 @@ mod tests {
         ];
 
         for (input, expected) in tests.iter() {
-            assert_eq!(
-                convert_to_bytes::<u8>(input),
-                *expected,
-                "Failed for input: {}",
-                input
-            );
+            assert_eq!(convert_to_bytes::<u8>(input), *expected, "Failed for input: {}", input);
         }
     }
 

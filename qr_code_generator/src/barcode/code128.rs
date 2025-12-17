@@ -91,9 +91,7 @@ impl<'a> Code128<'a> {
     /// Кодирует сообщение и конвертирует в сплошной вектор
     fn encode_and_convert(self) -> Result<Vec<u8>> {
         let encoded = self.encode_payload()?;
-        Ok(Self::convert_to_result(
-            encoded.into_iter().map(|unit| unit.encoding()),
-        ))
+        Ok(Self::convert_to_result(encoded.into_iter().map(|unit| unit.encoding())))
     }
 
     /// # Предупреждение
@@ -131,11 +129,7 @@ impl<'a> Code128<'a> {
         }
 
         if let Some(carry) = carry {
-            anyhow::bail!(
-                "Last carry is not empty: {}, CodeSet::{:?}",
-                carry,
-                self.codeset
-            );
+            anyhow::bail!("Last carry is not empty: {}, CodeSet::{:?}", carry, self.codeset);
         }
 
         // Завершение: контрольная сумма и стоп символ
@@ -273,11 +267,7 @@ mod tests {
     #[rstest]
     #[case("À\u{0000}\u{017A}Ć6369Ɓl`", vec![103, 64, 97, 99, 63, 69, 100, 76, 64, 15, 106], None)]
     #[case("\u{0000}\u{017A}", vec![103, 64, 97, 52, 106], Some(CodeSet::A))]
-    fn code128_test(
-        #[case] input: &str,
-        #[case] expected: Vec<usize>,
-        #[case] codeset: Option<CodeSet>,
-    ) {
+    fn code128_test(#[case] input: &str, #[case] expected: Vec<usize>, #[case] codeset: Option<CodeSet>) {
         let actual = if let Some(codeset) = codeset {
             Code128::encode_with_codeset(input, codeset)
         } else {
@@ -296,11 +286,7 @@ mod tests {
     #[rstest]
     #[case("ĆŹ4218402050À0", &"110100111001111010111010110111000110011100101100010100011001001110110001011101110101111010011101100101011110001100011101011", None)]
     #[case("ƁxyZÀ199!*1", &"1101001000011110010010110110111101110110001011101011110100111001101110010110011100101100110011011001100100010010011100110100101111001100011101011", None)]
-    fn code128_test_str(
-        #[case] input: &str,
-        #[case] expected: &str,
-        #[case] codeset: Option<CodeSet>,
-    ) {
+    fn code128_test_str(#[case] input: &str, #[case] expected: &str, #[case] codeset: Option<CodeSet>) {
         let actual_vec = if let Some(codeset) = codeset {
             Code128::encode_with_codeset(input, codeset)
         } else {

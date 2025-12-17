@@ -24,10 +24,7 @@ impl FastGF256 {
             }
         }
 
-        FastGF256 {
-            exp_table,
-            log_table,
-        }
+        FastGF256 { exp_table, log_table }
     }
 
     /// проверка таблицы логарифмов/экспонент
@@ -59,11 +56,7 @@ impl FastGF256 {
         let log_15 = self.log_table[15] as usize;
         let log_6 = self.log_table[6] as usize;
         println!("log(15) = {}, log(6) = {}", log_15, log_6);
-        println!(
-            "exp_table[{}] = {}",
-            log_15 + log_6,
-            self.exp_table[log_15 + log_6]
-        );
+        println!("exp_table[{}] = {}", log_15 + log_6, self.exp_table[log_15 + log_6]);
 
         println!()
     }
@@ -132,10 +125,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_gf256_performance() {
-        gf_tests::arithmetic_operations::test_gf256_performance(
-            FastGF256::new(),
-            std::time::Duration::from_secs(10),
-        );
+        gf_tests::arithmetic_operations::test_gf256_performance(FastGF256::new(), std::time::Duration::from_secs(10));
     }
 
     #[test]

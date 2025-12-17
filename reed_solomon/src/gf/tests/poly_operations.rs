@@ -31,11 +31,7 @@ pub fn test_eval_poly<T: GF256Poly>(gf: &T) {
         expected = gf.add(expected, n);
         expected = gf.add(expected, 1);
 
-        assert_eq!(
-            expected, actual,
-            "eval_poly(x² + x + 1, {}) = {}",
-            n, actual
-        );
+        assert_eq!(expected, actual, "eval_poly(x² + x + 1, {}) = {}", n, actual);
     }
 
     // Полином: x³

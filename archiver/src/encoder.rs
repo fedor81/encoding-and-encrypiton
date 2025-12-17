@@ -44,10 +44,7 @@ pub trait Encoder {
 
     fn encode_file(&self, path: &PathBuf) -> Result<Vec<u8>> {
         let mut file = File::open(path).expect("Failed to open file");
-        let size = file
-            .metadata()
-            .context("Failed to extract file metadata")?
-            .len();
+        let size = file.metadata().context("Failed to extract file metadata")?.len();
         let mut buf = Vec::with_capacity(size as usize);
         file.read_to_end(&mut buf).expect("Failed to read file");
 
@@ -75,11 +72,9 @@ where
         // Записываем размер состояния, состояние и сжатый файл
         Self::write_state(&state, &mut file)?;
         // Записываем размер исходного файла (usize)
-        file
-            .write_all(&original_size.to_le_bytes())
+        file.write_all(&original_size.to_le_bytes())
             .context("Failed to write original size")?;
-        file.write_all(&encoded_file?)
-            .context("Failed to write encoded file")?;
+        file.write_all(&encoded_file?).context("Failed to write encoded file")?;
         Ok(())
     }
 }

@@ -310,11 +310,7 @@ impl PartialEq for HuffmanTree {
                     index: other_index,
                     word: other_word,
                 },
-            ) => {
-                self_probability == other_probability
-                    && self_index == other_index
-                    && self_word == other_word
-            }
+            ) => self_probability == other_probability && self_index == other_index && self_word == other_word,
             (_, _) => false,
         }
     }
