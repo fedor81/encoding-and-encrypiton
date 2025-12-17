@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use pseudorandom::{LCG, PRNG, XorShift32, get_random_seed};
+use pseudorandom::{LCG, PRNG, XorShift32, extensions::F64Ext, get_random_seed};
 use strum::Display;
 
 fn main() -> Result<()> {
@@ -15,7 +15,13 @@ impl Cli {
         if self.test {
             Self::test(&mut generator);
         } else {
-            (0..self.count).for_each(|_| println!("{}", generator.next()));
+            (0..self.count).for_each(|_| {
+                if self.float {
+                    println!("{}", generator.next_f64())
+                } else {
+                    println!("{}", generator.next())
+                }
+            });
         }
 
         Ok(())
@@ -52,6 +58,9 @@ struct Cli {
     /// Запускает небольшое тестирование выбранного генератора
     #[arg(long)]
     test: bool,
+
+    #[arg(short, long)]
+    float: bool,
 }
 
 #[derive(Debug, ValueEnum, Default, Clone, Copy, Display)]
