@@ -1,5 +1,7 @@
 # Barcode and QR Code Generator
 
+Программа для генерации штрих кодов Code 128 и QR кодов
+
 ## Barcode
 
 Генератор штрих кодов Code 128:
